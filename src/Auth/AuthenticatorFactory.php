@@ -2,8 +2,8 @@
 
 namespace Api\Auth;
 
-use Api\Workspace;
-use Psr\Http\Message\ServerRequestInterface;
+use Api;
+use Psr;
 
 class AuthenticatorFactory
 {
@@ -15,7 +15,7 @@ class AuthenticatorFactory
         $this->authenticators[] = $authenticator;
     }
 
-    public function authenticate(ServerRequestInterface $request): ?Workspace
+    public function authenticate(Psr\Http\Message\ServerRequestInterface $request): ?Api\Workspace
     {
         foreach ($this->authenticators as $authenticator) {
             if ($authenticator->supports($request)) {

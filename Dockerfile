@@ -36,4 +36,6 @@ RUN mkdir -p /app/workspace && \
     chown -R www-data:www-data /app/workspace /app/temp && \
     chmod -R 775 /app/workspace /app/temp
 
+ENV API_TOKEN=${API_TOKEN}
+
 CMD ["php-fpm"]

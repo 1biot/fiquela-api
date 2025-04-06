@@ -11,3 +11,5 @@ services:
     - \Api\Endpoints\Files
     - \Api\Endpoints\History
     - \Api\Endpoints\Query
+
+    - \Api\Schemas\DownloadFile

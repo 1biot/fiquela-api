@@ -2,16 +2,15 @@
 
 namespace Api\Auth;
 
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use Psr\Http\Message\ResponseInterface;
 use Slim\Psr7\Response;
+use Slim\Psr7\Request;
 
 class AuthMiddleware
 {
     public function __construct(private AuthenticatorFactory $factory) {}
 
-    public function __invoke(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    public function __invoke(Request $request, RequestHandlerInterface $handler): Response
     {
         $workspace = $this->factory->authenticate($request);
         if (!$workspace) {

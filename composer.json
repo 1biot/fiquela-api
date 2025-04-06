@@ -1,6 +1,7 @@
 {
   "require": {
     "ext-mbstring": "*",
+    "ext-fileinfo": "*",
     "slim/slim": "4.*",
     "slim/psr7": "^1.7",
     "1biot/fiquela": "^2.0@RC",
@@ -12,7 +13,8 @@
     "nette/neon": "^3.4",
     "nette/di": "^3.2",
     "contributte/psr11-container-interface": "^0.6.0",
-    "symfony/uid": "^7.2"
+    "symfony/uid": "^7.2",
+    "guzzlehttp/guzzle": "^7.9"
   },
   "minimum-stability": "rc",
   "autoload": {

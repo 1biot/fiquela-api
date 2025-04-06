@@ -2,6 +2,7 @@
 
 namespace Api\Endpoints;
 
+use Api;
 use Fig\Http\Message\StatusCodeInterface as StatusCodes;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
@@ -12,14 +13,14 @@ use Tracy\Debugger;
 
 class Query extends Controller
 {
-    private const int DefaultLimit = 1000;
+    public const int DefaultLimit = 1000;
 
     public function __invoke(Request $request, Response $response, array $args): Response
     {
         Debugger::timer('query');
         try {
             $workspace = $this->getWorkspace($request);
-            $data = $request->getParsedBody();
+            $data = $this->validateRequest($request, new Api\Schemas\Query);
             $file = $data['file'] ?? null;
             $query = $data['query'] ?? '';
 

@@ -2,6 +2,7 @@
 
 namespace Api;
 
+use Api\Utils\Downloader;
 use FQL\Enum\Format;
 use FQL\Enum\Type;
 use FQL\Exception\FileNotFoundException;
@@ -18,7 +19,6 @@ class Workspace
     private const string CachePath = 'cache';
     private const string FilesPath = 'files';
     private const string HistoryPath = 'history';
-    private const string QueriesPath = 'queries';
     private const string SchemasPath = 'schemas';
 
     private readonly string $rootPath;
@@ -92,7 +92,7 @@ class Workspace
 
     public function addFileFromUploadedFile(UploadedFile $uploadedFile): array
     {
-        $format = $this->getFileType($uploadedFile, [\FQL\Enum\Format::class, 'fromExtension']);
+        $format = $this->getFileTypeFromUploadedFile($uploadedFile, [\FQL\Enum\Format::class, 'fromExtension']);
         $schema = $this->createSchemaFromUploadedFile($uploadedFile, $format);
         $moveToPath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
 
@@ -102,7 +102,7 @@ class Workspace
         return $schema;
     }
 
-    public function createSchemaFromUploadedFile(UploadedFile $uploadedFile, Format $format): array
+    private function createSchemaFromUploadedFile(UploadedFile $uploadedFile, Format $format): array
     {
         return [
             'uuid' => Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_DNS), $uploadedFile->getClientFilename())->toRfc4122(),
@@ -118,10 +118,26 @@ class Workspace
         ];
     }
 
+    private function createSchemaFromDownloadedFile(\SplFileInfo $file, Format $format): array
+    {
+        return [
+            'uuid' => Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_DNS), $file->getFilename())->toRfc4122(),
+            'originalName' => $file->getFilename(),
+            'name' => $this->normalizeFilename($file->getFilename()),
+            'encoding' => null,
+            'type' => $format->value,
+            'size' => $file->getSize(),
+            'delimiter' => null,
+            'query' => null,
+            'count' => 0,
+            'columns' => [],
+        ];
+    }
+
     /**
      * @param array $schema
      */
-    public function saveSchema(array $schema): void
+    public function saveSchema(array &$schema): void
     {
         $fileName = $this->getSchemasPath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $schema['name']);
         $this->extendsSchema($schema);
@@ -148,6 +164,11 @@ class Workspace
             $counter++;
             foreach (array_keys($item) as $key) {
                 $type = Type::match($item[$key]);
+                if ($type === Type::ARRAY && isset($item[$key]['@attributes']) && isset($item[$key]['value'])) {
+                    $type = Type::match($item[$key]['value']);
+                    $key = $key . '.value';
+                }
+
                 if (isset($arrayKeys[$key]) === false) {
                     $arrayKeys[$key] = [$type->value];
                     continue;
@@ -322,7 +343,7 @@ class Workspace
         }
     }
 
-    private function getFileType(UploadedFile $uploadedFile, ?callable $fallback = null): \FQL\Enum\Format
+    private function getFileTypeFromUploadedFile(UploadedFile $uploadedFile, ?callable $fallback = null): \FQL\Enum\Format
     {
         return \FQL\Enum\Format::from(match ($uploadedFile->getClientMediaType()) {
             'text/csv' => 'csv',
@@ -330,7 +351,23 @@ class Workspace
             'text/xml', 'application/xml' => 'xml',
             'application/yaml' => 'yaml',
             'application/neon' => 'neon',
-            default => $fallback ? $fallback($uploadedFile) : throw new \RuntimeException('Unsupported file type'),
+            default => $fallback
+                ? $fallback(pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION))
+                : throw new \RuntimeException('Unsupported file type'),
+        });
+    }
+
+    private function getFileTypeFromDownloadedFile(\SplFileInfo $downloadedFile, ?callable $fallback = null): \FQL\Enum\Format
+    {
+        return \FQL\Enum\Format::from(match (mime_content_type($downloadedFile->getPathname())) {
+            'text/csv' => 'csv',
+            'application/json' => 'jsonFile',
+            'text/xml', 'application/xml' => 'xml',
+            'application/yaml' => 'yaml',
+            'application/neon' => 'neon',
+            default => $fallback
+                ? $fallback($downloadedFile->getExtension())
+                : throw new \RuntimeException('Unsupported file type'),
         });
     }
 
@@ -350,6 +387,23 @@ class Workspace
         $safeExt = mb_substr($safeExt, 0, 5);
 
         return $safeExt ? "{$safeName}.{$safeExt}" : $safeName;
+    }
+
+    public function download(object|array|null $data)
+    {
+        $downloader = new Downloader();
+        $downloadedFile = $downloader->downloadToFile(
+            $data['url'],
+            $this->getFilesPath() . DIRECTORY_SEPARATOR . $data['name']
+        );
+        $format = $this->getFileTypeFromDownloadedFile($downloadedFile, [\FQL\Enum\Format::class, 'fromExtension']);
+        $schema = $this->createSchemaFromDownloadedFile($downloadedFile, $format);
+        $schema['encoding'] = $data['encoding'] ?? null;
+        $schema['delimiter'] = $data['delimiter'] ?? null;
+        $schema['query'] = $data['query'] ?? null;
+        chmod($downloadedFile, 0644);
+        $this->saveSchema($schema);
+        return $schema;
     }
 
 }

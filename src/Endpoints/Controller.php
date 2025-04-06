@@ -3,6 +3,8 @@
 namespace Api\Endpoints;
 
 use Api\Workspace;
+use Nette\Schema\Processor;
+use Api\Schemas\Schema;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
@@ -16,6 +18,11 @@ abstract class Controller
         }
 
         return $workspace;
+    }
+
+    protected function validateRequest(Request $request, Schema $schema): array
+    {
+        return (new Processor)->process($schema->getSchema(), $request->getParsedBody());
     }
 
     protected function json(Response $response, array $data, int $status = 200): Response

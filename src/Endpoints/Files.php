@@ -49,7 +49,7 @@ class Files extends Controller
         try {
             $workspace = $this->getWorkspace($request);
             $schema = $this->validateFile($workspace, $args);
-            $data = $this->validateUpdateData($request);
+            $data = $this->validateRequest($request, new Api\Schemas\UpdateFile);
             $updatedSchema = array_merge($schema, $data);
             $workspace->saveSchema($updatedSchema);
             return $this->json($response, ['message' => 'File updated']);
@@ -147,9 +147,8 @@ class Files extends Controller
     {
         try {
             $workspace = $this->getWorkspace($request);
-            $data = $request->getParsedBody();
-            //$schema = $workspace->addFileFromJson($data);
-            return $this->json($response, ['schema' => []]);
+            $schema = $workspace->download($this->validateRequest($request, new Api\Schemas\DownloadFile));
+            return $this->json($response, ['schema' => $schema]);
         } catch (\Throwable $e) {
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }

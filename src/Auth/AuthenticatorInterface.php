@@ -2,11 +2,11 @@
 
 namespace Api\Auth;
 
-use Api\Workspace;
-use Psr\Http\Message\ServerRequestInterface;
+use Api;
+use Psr;
 
 interface AuthenticatorInterface
 {
-    public function supports(ServerRequestInterface $request): bool;
-    public function authenticate(ServerRequestInterface $request): ?Workspace;
+    public function supports(Psr\Http\Message\ServerRequestInterface $request): bool;
+    public function authenticate(Psr\Http\Message\ServerRequestInterface $request): ?Api\Workspace;
 }
