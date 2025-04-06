@@ -5,6 +5,8 @@ services:
       args:
         API_TOKEN: ${API_TOKEN}
     container_name: fiquela-api
+    volumes:
+      - ./workspace:/app/workspace
     expose:
       - "9000"
 
