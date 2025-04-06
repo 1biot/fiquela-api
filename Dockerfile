@@ -31,12 +31,12 @@ COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /app
 
-RUN mkdir -p /app/workspace && \
-    mkdir -p /app/temp && \
-    chown -R www-data:www-data /app/workspace /app/temp && \
-    chmod -R 775 /app/workspace /app/temp
+RUN mkdir -p /app/temp && \
+    chown -R www-data:www-data /app/temp && \
+    chmod -R 775 /app/temp
 
 ARG API_TOKEN
 ENV API_TOKEN=${API_TOKEN}
 
-CMD ["php-fpm"]
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
