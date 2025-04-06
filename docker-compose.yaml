@@ -4,7 +4,7 @@ services:
       context: .
     container_name: fiquela-api
     environment:
-      - API_TOKEN=${API_TOKEN}
+      - API_TOKEN
     expose:
       - "9000"
 
