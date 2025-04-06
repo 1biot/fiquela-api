@@ -1,0 +1,9 @@
+includes:
+    - services.neon
+
+
+parameters:
+    rootDir: ./..
+    wwwDir: %rootDir%/public
+    workspacePath: %rootDir%/workspace
+    apiKey: ::getenv(API_TOKEN)

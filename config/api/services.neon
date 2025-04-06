@@ -1,0 +1,13 @@
+services:
+    tokenAuthenticator: \Api\Auth\TokenAuthenticator(%apiKey%, @workspace)
+    workspace: \Api\Workspace(%workspacePath%)
+    authenticatorFactory:
+        class: \Api\Auth\AuthenticatorFactory()
+        setup:
+            - register(@tokenAuthenticator)
+
+    - \Api\Auth\AuthMiddleware(@authenticatorFactory)
+    - \Api\Endpoints\Export
+    - \Api\Endpoints\Files
+    - \Api\Endpoints\History
+    - \Api\Endpoints\Query

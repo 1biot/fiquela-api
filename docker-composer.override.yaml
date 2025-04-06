@@ -1,0 +1,10 @@
+services:
+  app:
+    volumes:
+      - .:/app
+      - ./workspace:/app/workspace:delegated
+
+  web:
+    volumes:
+      - .:/app
+      - ./config/nginx:/etc/nginx/conf.d

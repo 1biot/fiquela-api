@@ -1,0 +1,10 @@
+.idea
+config/nginx
+http
+workspace
+vendor
+temp
+.gitattributes
+.gitignore
+*.http
+http-client.*.json

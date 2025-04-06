@@ -1,0 +1,8 @@
+.idea
+http
+temp
+vendor
+workspace
+.env
+**.DS_Store
+http-client.*.json
