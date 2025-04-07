@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "31bf3eaee679fab9b07c01752eca76cd",
+    "content-hash": "f58f2c5dc9249a764692504ef2412881",
     "packages": [
         {
             "name": "1biot/fiquela",
-            "version": "v2.0.0-rc3",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/1biot/FiQueLa.git",
-                "reference": "bba125da44e449bbed4d9dffc9a8c8a1a281ea4c"
+                "reference": "e9460e8f4686f1e48187f8c7975e8baccb11b78d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/bba125da44e449bbed4d9dffc9a8c8a1a281ea4c",
-                "reference": "bba125da44e449bbed4d9dffc9a8c8a1a281ea4c",
+                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/e9460e8f4686f1e48187f8c7975e8baccb11b78d",
+                "reference": "e9460e8f4686f1e48187f8c7975e8baccb11b78d",
                 "shasum": ""
             },
             "require": {
@@ -53,9 +53,9 @@
             "description": "FiQueLa - File Query Language - PHP library for querying files",
             "support": {
                 "issues": "https://github.com/1biot/FiQueLa/issues",
-                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.0-rc3"
+                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.0"
             },
-            "time": "2025-04-05T16:40:22+00:00"
+            "time": "2025-04-07T16:31:13+00:00"
         },
         {
             "name": "contributte/psr11-container-interface",
@@ -2294,7 +2294,8 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "ext-mbstring": "*"
+        "ext-mbstring": "*",
+        "ext-fileinfo": "*"
     },
     "platform-dev": [],
     "plugin-api-version": "2.6.0"
