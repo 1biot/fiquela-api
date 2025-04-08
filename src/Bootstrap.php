@@ -21,6 +21,12 @@ class Bootstrap
 
     public static function addRouting(Slim\App $app): void
     {
+        $app->get('/', function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
+            $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
+            $response->getBody()->write('FiQueLa API');
+            return $response;
+        });
+
         $app->group('/api/v1', function (RouteCollectorProxyInterface $group) {
             $group->get('/files', [Endpoints\Files::class, 'list']);
             $group->post('/files', [Endpoints\Files::class, 'insert']);
