@@ -76,18 +76,19 @@ class Workspace
         $sqlQuery = new Sql\Sql(trim($query));
         $sqlQuery->setBasePath($this->getFilesPath());
         $queryObject = isset($stream) ? $sqlQuery->parseWithQuery($stream->query()) : $sqlQuery->toQuery();
-        $queryHash = md5((string) $queryObject);
         if (is_writable($this->getCachePath())) {
             if (!$this->queryResultExists($queryObject)) {
                 $this->saveQueryResult($queryObject);
             }
         }
 
+        $originalQuery = $queryObject;
         if ($this->queryResultExists($queryObject)) {
             $queryObject = Stream\JsonStream::open($this->getQueryCacheFile($queryObject))->query();
         }
 
-        return [$queryObject, $queryHash];
+        $this->logQuery($query, $originalQuery);
+        return [$queryObject, md5((string) $originalQuery)];
     }
 
     public function addFileFromUploadedFile(UploadedFile $uploadedFile): array
@@ -189,16 +190,22 @@ class Workspace
         $schema['count'] = $counter;
     }
 
-    public function logQuery(string $query): void
+    public function logQuery(string $query, ?Interface\Query $queryObject = null): void
     {
-        $fileName = $this->getHistoryPath() . DIRECTORY_SEPARATOR . date('Y-m-d') . '.ndjson';
+        $insert = [
+            'date' => (new \DateTime())->format(\DateTimeInterface::RFC3339),
+            'query' => $this->normalizeQuery($query),
+        ];
+
+        if ($queryObject !== null) {
+            $insert['runs'] = $this->normalizeQuery((string) $queryObject);
+        }
+
         file_put_contents(
-            $fileName,
-            json_encode([
-                'date' => (new \DateTime())->format(\DateTimeInterface::RFC3339),
-                'query' => $query,
-            ]) . PHP_EOL,
-            FILE_APPEND);
+            $this->getHistoryPath() . DIRECTORY_SEPARATOR . date('Y-m-d') . '.ndjson',
+            json_encode($insert) . PHP_EOL,
+            FILE_APPEND
+        );
     }
 
     public function getFilesSchemas(): array
@@ -267,14 +274,23 @@ class Workspace
     public function getHistory(?\DateTime $date = null, string $last = '-7 days'): array
     {
         $historyFiles = [];
-        foreach (glob($this->getHistoryPath() . DIRECTORY_SEPARATOR . '*.ndjson') as $file) {
+        foreach (scandir($this->getHistoryPath(), SCANDIR_SORT_DESCENDING) as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
             $fileDate = \DateTime::createFromFormat('Y-m-d', basename($file, '.ndjson'));
-            if ($fileDate->getTimestamp() < (new \DateTime($last))->getTimestamp()) {
+            if (
+                $fileDate === false
+                || $fileDate->getTimestamp() < (new \DateTime($last))->getTimestamp()
+                || pathinfo($file, PATHINFO_EXTENSION) !== 'ndjson'
+            ) {
+                unlink($this->getHistoryPath() . DIRECTORY_SEPARATOR . $file);
                 continue;
             }
 
             if ($date === null || $fileDate->format('Y-m-d') === $date->format('Y-m-d')) {
-                $historyFiles[] = $file;
+                $historyFiles[] = $this->getHistoryPath() . DIRECTORY_SEPARATOR . $file;;
             }
         }
 
@@ -284,15 +300,16 @@ class Workspace
             if ($fileDate === false) {
                 continue;
             }
-            $fileDate = $fileDate->format('Y-m-d');
 
             $historyResult = \FQL\Stream\Provider::fromFile($historyFile)->query()
                 ->select('date')->as('created_at')
                 ->select('query')
+                ->coalesce('runs', 'query')->as('runs')
+                ->orderBy('created_at')->desc()
                 ->execute(StreamResults::class);
 
             foreach ($historyResult->getIterator() as $history) {
-                $historyResponse[] = array_merge(['date' => $fileDate], $history);
+                $historyResponse[] = $history;
             }
         }
 
@@ -404,6 +421,12 @@ class Workspace
         chmod($downloadedFile, 0644);
         $this->saveSchema($schema);
         return $schema;
+    }
+
+    private function normalizeQuery(string $queryString): string
+    {
+        $queryString = preg_replace('/\s+/', ' ', $queryString);
+        return trim($queryString);
     }
 
 }

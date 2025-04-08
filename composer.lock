@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f58f2c5dc9249a764692504ef2412881",
+    "content-hash": "af6dd99036bea0d93c1a1c6c799bf3f0",
     "packages": [
         {
             "name": "1biot/fiquela",
-            "version": "v2.0.0",
+            "version": "v2.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/1biot/FiQueLa.git",
-                "reference": "e9460e8f4686f1e48187f8c7975e8baccb11b78d"
+                "reference": "2b41604445e9d444db2d02eff67152c3f35b2258"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/e9460e8f4686f1e48187f8c7975e8baccb11b78d",
-                "reference": "e9460e8f4686f1e48187f8c7975e8baccb11b78d",
+                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/2b41604445e9d444db2d02eff67152c3f35b2258",
+                "reference": "2b41604445e9d444db2d02eff67152c3f35b2258",
                 "shasum": ""
             },
             "require": {
@@ -53,9 +53,9 @@
             "description": "FiQueLa - File Query Language - PHP library for querying files",
             "support": {
                 "issues": "https://github.com/1biot/FiQueLa/issues",
-                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.0"
+                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.1"
             },
-            "time": "2025-04-07T16:31:13+00:00"
+            "time": "2025-04-08T11:33:08+00:00"
         },
         {
             "name": "contributte/psr11-container-interface",
@@ -2287,10 +2287,8 @@
     ],
     "packages-dev": [],
     "aliases": [],
-    "minimum-stability": "RC",
-    "stability-flags": {
-        "1biot/fiquela": 5
-    },
+    "minimum-stability": "stable",
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

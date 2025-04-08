@@ -24,9 +24,8 @@ class Query extends Controller
             $file = $data['file'] ?? null;
             $query = $data['query'] ?? '';
 
-            [$queryObject, $originQueryHash] = $workspace->runQuery($query, $file);
-            $workspace->logQuery($query);
-            $count = $queryObject->execute()->count();
+            [$cachedQuery, $originQueryHash] = $workspace->runQuery($query, $file);
+            $count = $cachedQuery->execute()->count();
 
             $paginator = new Paginator;
             $paginator->setItemCount($count);
@@ -34,7 +33,7 @@ class Query extends Controller
             $paginator->setItemsPerPage(min(self::DefaultLimit, $count, (int) ($data['limit'] ?? self::DefaultLimit)));
 
             if ($paginator->getPageCount() > 1) {
-                $queryObject->offset($paginator->getOffset())
+                $cachedQuery->offset($paginator->getOffset())
                     ->limit($paginator->getItemsPerPage());
             }
 
@@ -43,7 +42,7 @@ class Query extends Controller
                 [
                     'query' => (string) $query,
                     'hash' => $originQueryHash,
-                    'data' => iterator_to_array($queryObject->execute()->getIterator()),
+                    'data' => iterator_to_array($cachedQuery->execute()->getIterator()),
                     'elapsed' => round(Debugger::timer('query') * 1000, 2), // in milliseconds
                     'pagination' => [
                         'page' => $paginator->getPage(),

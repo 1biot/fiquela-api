@@ -4,7 +4,7 @@
     "ext-fileinfo": "*",
     "slim/slim": "4.*",
     "slim/psr7": "^1.7",
-    "1biot/fiquela": "^2.0@RC",
+    "1biot/fiquela": "^2.0",
     "nette/utils": "^4.0",
     "tracy/tracy": "^2.10",
     "league/csv": "^9.23",
@@ -16,7 +16,7 @@
     "symfony/uid": "^7.2",
     "guzzlehttp/guzzle": "^7.9"
   },
-  "minimum-stability": "rc",
+  "minimum-stability": "stable",
   "autoload": {
     "psr-4": {
       "Api\\": "./src/"
