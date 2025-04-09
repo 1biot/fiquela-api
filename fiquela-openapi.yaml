@@ -2,6 +2,11 @@ info:
   title: FiQueLa API
   version: 1.0.0
 openapi: 3.0.3
+servers:
+  - url: http://localhost:6917
+    description: Local server
+  - url: https:/fiquela.preved.to
+    description: Online test server
 tags:
   - name: Files
     description: File management operations
