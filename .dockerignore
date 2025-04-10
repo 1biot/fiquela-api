@@ -4,6 +4,7 @@ http
 workspace
 vendor
 temp
+.env
 .gitattributes
 .gitignore
 *.http

@@ -13,14 +13,24 @@ class Bootstrap
     public static function createContainer(): Container\ContainerInterface
     {
         $loader = new Nette\DI\ContainerLoader(__DIR__ . '/../temp', true);
+        self::loadEnvironmentVariables();
         $class = $loader->load(function($compiler) {
             $compiler->loadConfig(__DIR__ . '/../config/api/config.neon');
         });
+
         return new Contributte\Psr11\Container(new $class);
+    }
+
+    private static function loadEnvironmentVariables(): void
+    {
+        if (file_exists(__DIR__ . '/../.env')) {
+            \Dotenv\Dotenv::createUnsafeImmutable(dirname(__DIR__))->load();
+        }
     }
 
     public static function addRouting(Slim\App $app): void
     {
+        self::addCorsPolicy($app);
         $app->get('/', function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
             $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
             $response->getBody()->write('FiQueLa API');
@@ -47,5 +57,15 @@ class Bootstrap
                 return $response;
             });
         })->add(Auth\AuthMiddleware::class);
+    }
+
+    private static function addCorsPolicy(Slim\App $app): void
+    {
+        $app->add(function (Slim\Psr7\Request $request, Slim\Psr7\Response $response, callable $next) {
+            $response = $next($request, $response);
+            return $response->withHeader('Access-Control-Allow-Origin', '*')
+                ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+                ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        });
     }
 }

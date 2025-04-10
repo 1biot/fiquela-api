@@ -2,7 +2,9 @@
 
 **Version:** 1.0.0
 
-FiQueLa API provides a powerful, RESTful interface for managing and querying structured file data using SQL-like syntax. Built upon the versatile FiQueLa PHP library, it seamlessly supports formats such as XML, JSON, CSV, YAML, and NEON, making it ideal for applications dealing with dynamic data imports, exports, and complex queries.
+FiQueLa API provides a powerful, RESTful interface for managing and querying structured file data using SQL-like syntax.
+Built upon the versatile FiQueLa PHP library, it seamlessly supports formats such as XML, JSON, CSV, YAML, and NEON,
+making it ideal for applications dealing with dynamic data imports, exports, and complex queries.
 
 ---
 
@@ -106,18 +108,67 @@ POST /api/v1/query
 
 ## 🔧 Installation & Setup
 
-1. Clone the repository.
-2. Configure your environment variables.
-3. Run migrations (if applicable).
-4. Launch the API server.
+### 1. Clone the repository
 
-Detailed installation instructions can be found in the [official documentation](#).
+```bash
+git clone https://github.com/1biot/fiquela-api.git fiquela-api
+cd fiquela-api
+```
 
----
+### 2. Configure your environment variables
 
-## 📚 Documentation
+```bash
+touch .env
+```
 
-Full API documentation and detailed examples are available in our [FiQueLa documentation](https://github.com/1biot/FiQueLa/blob/main/docs/file-query-language.md).
+put your `API_TOKEN` to `.env` file. You can create a random token using the following command:
+
+```bash
+echo "API_TOKEN=$(openssl rand -hex 32)" >> .env
+```
+
+Final setup should look like this:
+
+```bash
+API_TOKEN=da3f318b3286de70700abd7340e0b4117d43a80e8130caf532da3cc732128d80
+```
+
+### 3. Without docker
+
+#### install dependencies
+
+```bash
+composer install && mkdir ./workspace ./temp
+cd ./public && php -S localhost:6917
+```
+
+### 3. Build the API server
+
+#### Localhost
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml build
+```
+
+#### Coolify
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.clf.yaml build
+```
+
+### 4. Launch the API server
+
+#### Localhost
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d
+```
+
+#### Coolify
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.clf.yaml up -d
+```
 
 ---
 
