@@ -5,8 +5,10 @@ namespace Api;
 use Contributte;
 use Nette;
 use Psr\Container;
+use Psr\Http\Server\RequestHandlerInterface;
 use Slim;
 use Slim\Interfaces\RouteCollectorProxyInterface;
+use Slim\Psr7\Request;
 
 class Bootstrap
 {
@@ -61,11 +63,15 @@ class Bootstrap
 
     private static function addCorsPolicy(Slim\App $app): void
     {
-        $app->add(function (Slim\Psr7\Request $request, Slim\Psr7\Response $response, callable $next) {
-            $response = $next($request, $response);
+        $app->add(function (Request $request, RequestHandlerInterface $handler) {
+            $response = $handler->handle($request);
             return $response->withHeader('Access-Control-Allow-Origin', '*')
                 ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
                 ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+        });
+
+        $app->options('/{routes:.+}', function ($request, $response) {
+            return $response;
         });
     }
 }
