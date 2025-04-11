@@ -64,14 +64,23 @@ class Bootstrap
     private static function addCorsPolicy(Slim\App $app): void
     {
         $app->add(function (Request $request, RequestHandlerInterface $handler) {
-            $response = $handler->handle($request);
-            return $response->withHeader('Access-Control-Allow-Origin', '*')
+            $origin = $request->getHeaderLine('Origin') ?: '*';
+
+            if ($request->getMethod() === 'OPTIONS') {
+                $response = new Slim\Psr7\Response();
+            } else {
+                $response = $handler->handle($request);
+            }
+
+            return $response
+                ->withHeader('Access-Control-Allow-Origin', $origin)
                 ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization');
+                ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+                ->withHeader('Access-Control-Allow-Credentials', 'true');
         });
 
         $app->options('/{routes:.+}', function ($request, $response) {
-            return $response;
+            return $response->withStatus(200);
         });
     }
 }
