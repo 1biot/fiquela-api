@@ -5,10 +5,8 @@ namespace Api;
 use Contributte;
 use Nette;
 use Psr\Container;
-use Psr\Http\Server\RequestHandlerInterface;
 use Slim;
 use Slim\Interfaces\RouteCollectorProxyInterface;
-use Slim\Psr7\Request;
 
 class Bootstrap
 {
@@ -32,7 +30,7 @@ class Bootstrap
 
     public static function addRouting(Slim\App $app): void
     {
-        self::addCorsPolicy($app);
+        $app->add(Middlewares\CorsMiddleware::class);
         $app->get('/', function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
             $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
             $response->getBody()->write('FiQueLa API');
@@ -58,29 +56,6 @@ class Bootstrap
                 $response->getBody()->write('pong');
                 return $response;
             });
-        })->add(Auth\AuthMiddleware::class);
-    }
-
-    private static function addCorsPolicy(Slim\App $app): void
-    {
-        $app->add(function (Request $request, RequestHandlerInterface $handler) {
-            $origin = $request->getHeaderLine('Origin') ?: '*';
-
-            if ($request->getMethod() === 'OPTIONS') {
-                $response = new Slim\Psr7\Response();
-            } else {
-                $response = $handler->handle($request);
-            }
-
-            return $response
-                ->withHeader('Access-Control-Allow-Origin', $origin)
-                ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-                ->withHeader('Access-Control-Allow-Credentials', 'true');
-        });
-
-        $app->options('/{routes:.+}', function ($request, $response) {
-            return $response->withStatus(200);
-        });
+        })->add(Middlewares\AuthMiddleware::class);
     }
 }

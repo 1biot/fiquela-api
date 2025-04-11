@@ -6,7 +6,8 @@ services:
         setup:
             - register(@tokenAuthenticator)
 
-    - \Api\Auth\AuthMiddleware(@authenticatorFactory)
+    - \Api\Middlewares\AuthMiddleware(@authenticatorFactory)
+
     - \Api\Endpoints\Export
     - \Api\Endpoints\Files
     - \Api\Endpoints\History
