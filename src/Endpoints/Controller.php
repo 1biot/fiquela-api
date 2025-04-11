@@ -27,7 +27,10 @@ abstract class Controller
 
     protected function json(Response $response, array $data, int $status = 200): Response
     {
-        $response->getBody()->write(json_encode($data));
-        return $response->withHeader('Content-Type', 'application/json')->withStatus($status);
+        $responseContent = $response->getBody();
+        $responseContent->write(json_encode($data));
+        return $response->withStatus($status)
+            ->withHeader('Content-Type', 'application/json')
+            ->withBody($responseContent);
     }
 }

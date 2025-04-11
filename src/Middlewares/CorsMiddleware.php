@@ -2,25 +2,27 @@
 
 namespace Api\Middlewares;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Http;
+use Slim\Psr7;
 
-class CorsMiddleware implements \Psr\Http\Server\MiddlewareInterface
+class CorsMiddleware implements Http\Server\MiddlewareInterface
 {
-    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    public function process(
+        Http\Message\ServerRequestInterface $request,
+        Http\Server\RequestHandlerInterface $handler
+    ): Http\Message\ResponseInterface
     {
         $origin = $request->getHeaderLine('Origin') ?? '*';
 
         if ($request->getMethod() === 'OPTIONS') {
-            return $this->applyCorsHeaders(new \Slim\Psr7\Response(), $origin);
+            return $this->applyCorsHeaders(new Psr7\Response(), $origin);
         }
 
         $response = $handler->handle($request);
         return $this->applyCorsHeaders($response, $origin);
     }
 
-    private function applyCorsHeaders(ResponseInterface $response, string $origin): ResponseInterface
+    private function applyCorsHeaders(Http\Message\ResponseInterface $response, string $origin): Http\Message\ResponseInterface
     {
         return $response
             ->withHeader('Access-Control-Allow-Origin', $origin)

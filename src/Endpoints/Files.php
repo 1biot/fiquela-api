@@ -92,23 +92,6 @@ class Files extends Controller
         return $schema;
     }
 
-    /**
-     * @param Psr7\Request $request
-     * @return array{delimiter?: ?string, query?: ?string, encoding?: ?string}
-     */
-    private function validateUpdateData(Psr7\Request $request): array
-    {
-        $data = $request->getParsedBody();
-        $allowedFields = ['query', 'delimiter', 'encoding'];
-        foreach ($data as $field => $value) {
-            if (!in_array($field, $allowedFields, true)) {
-                throw new \RuntimeException('Invalid field: ' . $field);
-            }
-        }
-
-        return $data;
-    }
-
     private function upload(Psr7\Request $request, Psr7\Response $response, array $args): Psr7\Response
     {
         try {
