@@ -9,6 +9,7 @@ use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
 use FQL\Interface;
 use FQL\Results\Stream as StreamResults;
+use FQL\Query;
 use FQL\Sql;
 use FQL\Stream;
 use Slim\Psr7\UploadedFile;
