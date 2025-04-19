@@ -1,4 +1,7 @@
 services:
   app:
     volumes:
-      - ./workspace:/app/workspace
+      - fiquela-workspace:/app/workspace
+
+volumes:
+  fiquela-workspace:

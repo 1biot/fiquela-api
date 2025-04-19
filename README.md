@@ -45,26 +45,20 @@ All endpoints are secured via `Bearer Authentication`. Obtain a valid token and 
 Authorization: Bearer <your_token>
 ```
 
-### Base URL
-
-```
-https://your-domain.com/api/v1
-```
-
 ### Endpoints
 
-| Endpoint          | Method   | Description                         |
-| ----------------- | -------- | ----------------------------------- |
-| `/files`          | `GET`    | List all files                      |
-| `/files`          | `POST`   | Upload a file                       |
-| `/files/{uuid}`   | `GET`    | Get file details and schema         |
-| `/files/{uuid}`   | `POST`   | Update file details and export data |
-| `/files/{uuid}`   | `DELETE` | Delete file                         |
-| `/query`          | `POST`   | Execute SQL-like queries            |
-| `/export/{hash}`  | `GET`    | Export data in specified format     |
-| `/history`        | `GET`    | Get query history                   |
-| `/history/{date}` | `GET`    | Get query history by date           |
-| `/ping`           | `GET`    | API Health Check                    |
+| Endpoint                   | Method   | Description                         |
+|----------------------------| -------- | ----------------------------------- |
+| `/api/v1/files`            | `GET`    | List all files                      |
+| `/api/v1/files`            | `POST`   | Upload a file                       |
+| `/api/v1/files/{uuid}`     | `GET`    | Get file details and schema         |
+| `/api/v1/files/{uuid}`     | `POST`   | Update file details and export data |
+| `/api/v1/files/{uuid}`     | `DELETE` | Delete file                         |
+| `/api/v1/query`            | `POST`   | Execute SQL-like queries            |
+| `/api/v1/export/{hash}`    | `GET`    | Export data in specified format     |
+| `/api/v1/history`          | `GET`    | Get query history                   |
+| `/api/v1/history/{date}`   | `GET`    | Get query history by date           |
+| `/api/v1/ping`             | `GET`    | API Health Check                    |
 
 ---
 
