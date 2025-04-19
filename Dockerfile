@@ -33,6 +33,8 @@ COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /app
 
+VOLUME /app/workspace
+
 RUN mkdir -p /app/temp && \
     chown -R www-data:www-data /app/temp && \
     chmod -R 775 /app/temp
