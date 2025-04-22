@@ -63,7 +63,7 @@ class Workspace
     }
 
     /**
-     * @return array{0: Interface\Query, 1: string}
+     * @return array{0: Interface\Query, 1: string, 2: Query\FileQuery}
      * @throws InvalidFormatException
      * @throws FileNotFoundException
      * @throws \Exception
@@ -71,12 +71,20 @@ class Workspace
     public function runQuery(string $query, ?string $fileName = null): array
     {
         if ($fileName !== null) {
-            $stream = Stream\Provider::fromFile($this->getFilesPath() . DIRECTORY_SEPARATOR . $fileName);
+            $schema = $this->getSchemaByFileName($fileName);
+            if (!$schema) {
+                throw new FileNotFoundException('Schema of file not found');
+            }
+
+            $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
         }
 
         $sqlQuery = new Sql\Sql(trim($query));
         $sqlQuery->setBasePath($this->getFilesPath());
-        $queryObject = isset($stream) ? $sqlQuery->parseWithQuery($stream->query()) : $sqlQuery->toQuery();
+        $queryObject = isset($queryObject)
+            ? $sqlQuery->parseWithQuery($queryObject)
+            : $sqlQuery->toQuery();
+
         if (is_writable($this->getCachePath())) {
             if (!$this->queryResultExists($queryObject)) {
                 $this->saveQueryResult($queryObject);
@@ -84,12 +92,42 @@ class Workspace
         }
 
         $originalQuery = $queryObject;
+        $originalFileQuery = $originalQuery->provideFileQuery();
         if ($this->queryResultExists($queryObject)) {
             $queryObject = Stream\JsonStream::open($this->getQueryCacheFile($queryObject))->query();
         }
 
         $this->logQuery($query, $originalQuery);
-        return [$queryObject, md5((string) $originalQuery)];
+        return [$queryObject, md5((string) $originalQuery), $originalFileQuery];
+    }
+
+    protected function schemaToFileQuery(array $schema): string
+    {
+        $fileQuery = '';
+        if (isset($schema['type']) && $schema['type'] !== '') {
+            $fileQuery .= sprintf('[%s]', $schema['type']);
+        }
+
+        $fileProperties = [];
+        if (isset($schema['name']) && $schema['name'] !== '') {
+            // use correct file name path
+            $fileProperties[] = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
+        }
+
+        if (isset($schema['encoding']) && $schema['encoding'] !== '') {
+            $fileProperties[] = $schema['encoding'];
+            if (isset($schema['delimiter']) && $schema['delimiter'] !== '') {
+                $fileProperties[] = sprintf('"%s"', $schema['delimiter']);
+            }
+        }
+
+        $fileQuery .= sprintf('(%s)', implode(',', $fileProperties));
+
+        if (isset($schema['query']) && $schema['query'] !== '') {
+            $fileQuery .= '.' . $schema['query'];
+        }
+
+        return $fileQuery;
     }
 
     public function addFileFromUploadedFile(UploadedFile $uploadedFile): array
@@ -142,53 +180,57 @@ class Workspace
     public function saveSchema(array &$schema): void
     {
         $fileName = $this->getSchemasPath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $schema['name']);
-        $this->extendsSchema($schema);
-        file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
+        if ($this->extendsSchema($schema)) {
+            file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
+        }
     }
 
-    public function extendsSchema(array &$schema): void
+    public function extendsSchema(array &$schema): bool
     {
         $query = $schema['query'] ?? '';
         if ($query === '') {
             $schema['columns'] = [];
             $schema['count'] = 0;
-            return;
+            return true;
         }
 
-        $queryObject = Stream\Provider::fromFile(
-            $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'],
-            Format::from($schema['type'])
-        )->query();
+        try {
+            $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
+            $counter = 0;
+            $arrayKeys = [];
+            foreach ($queryObject->selectAll()->execute(StreamResults::class)->getIterator() as $item) {
+                $counter++;
+                foreach (array_keys($item) as $key) {
+                    $type = Type::match($item[$key]);
+                    if ($type === Type::ARRAY && isset($item[$key]['@attributes']) && isset($item[$key]['value'])) {
+                        $type = Type::match($item[$key]['value']);
+                        $key = $key . '.value';
+                    }
 
-        $counter = 0;
-        $arrayKeys = [];
-        foreach ($queryObject->selectAll()->from($query)->execute(StreamResults::class)->getIterator() as $item) {
-            $counter++;
-            foreach (array_keys($item) as $key) {
-                $type = Type::match($item[$key]);
-                if ($type === Type::ARRAY && isset($item[$key]['@attributes']) && isset($item[$key]['value'])) {
-                    $type = Type::match($item[$key]['value']);
-                    $key = $key . '.value';
-                }
+                    if (isset($arrayKeys[$key]) === false) {
+                        $arrayKeys[$key] = [$type->value];
+                        continue;
+                    }
 
-                if (isset($arrayKeys[$key]) === false) {
-                    $arrayKeys[$key] = [$type->value];
-                    continue;
-                }
-
-                if (in_array($type->value, $arrayKeys[$key], true) === false) {
-                    $arrayKeys[$key][] = $type->value;
+                    if (in_array($type->value, $arrayKeys[$key], true) === false) {
+                        $arrayKeys[$key][] = $type->value;
+                    }
                 }
             }
-        }
 
-        $schema['columns'] = array_map(function ($key) use ($arrayKeys) {
-            return [
-                'column' => $key,
-                'types' => $arrayKeys[$key]
-            ];
-        }, array_keys($arrayKeys));
-        $schema['count'] = $counter;
+            $schema['columns'] = array_map(function ($key) use ($arrayKeys) {
+                return [
+                    'column' => $key,
+                    'types' => $arrayKeys[$key]
+                ];
+            }, array_keys($arrayKeys));
+            $schema['count'] = $counter;
+            return true;
+        } catch (\Exception) {
+            $schema['columns'] = [];
+            $schema['count'] = 0;
+            return false;
+        }
     }
 
     public function logQuery(string $query, ?Interface\Query $queryObject = null): void
@@ -227,10 +269,21 @@ class Workspace
         return $schemas;
     }
 
-    public function getSchema(string $uuid)
+    public function getSchema(string $uuid): ?array
     {
         foreach ($this->getFilesSchemas() as $schema) {
             if ($schema['uuid'] === $uuid) {
+                return $schema;
+            }
+        }
+
+        return null;
+    }
+
+    public function getSchemaByFileName(string $fileName): ?array
+    {
+        foreach ($this->getFilesSchemas() as $schema) {
+            if ($schema['name'] === $fileName) {
                 return $schema;
             }
         }

@@ -24,7 +24,7 @@ class Query extends Controller
             $file = $data['file'] ?? null;
             $query = $data['query'] ?? '';
 
-            [$cachedQuery, $originQueryHash] = $workspace->runQuery($query, $file);
+            [$cachedQuery, $originQueryHash, $originalFileQuery] = $workspace->runQuery($query, $file);
             $count = $cachedQuery->execute()->count();
 
             $paginator = new Paginator;
@@ -41,6 +41,7 @@ class Query extends Controller
                 $response,
                 [
                     'query' => (string) $query,
+                    'file' => $originalFileQuery->file,
                     'hash' => $originQueryHash,
                     'data' => iterator_to_array($cachedQuery->execute()->getIterator()),
                     'elapsed' => round(Debugger::timer('query') * 1000, 2), // in milliseconds

@@ -121,10 +121,12 @@ components:
           nullable: true
       required:
         - query
-    QueryResultShema:
+    QueryResultSchema:
       type: object
       properties:
         query:
+          type: string
+        file:
           type: string
         hash:
           type: string
@@ -139,6 +141,7 @@ components:
           $ref: '#/components/schemas/PaginationSchema'
       required:
         - query
+        - file
         - hash
         - data
         - elapsed
@@ -268,6 +271,30 @@ paths:
       responses:
         '200':
           description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema:
+                    $ref: '#/components/schemas/FileSchema'
+              example:
+                schema:
+                  uuid: "12345678-1234-5678-1234-123456789012"
+                  name: "example.xml"
+                  encoding: "utf-8"
+                  type: "xml"
+                  size: 123456
+                  delimiter: null
+                  query: "channel.items"
+                  count: 100
+                  columns:
+                    - column: "title"
+                      types: ["string"]
+                    - column: "images"
+                      types: ["array"]
+                    - column: "price"
+                      types: ["double"]
       summary: Generate query-based export for file
     delete:
       tags:
@@ -317,9 +344,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/QueryResultShema'
+                $ref: '#/components/schemas/QueryResultSchema'
               example:
                 query: "SELECT * FROM [xml](file.xml).channel.item WHERE code = '1234'"
+                file: "file.xml"
                 hash: "ef0b589d95c65a6a4f7c075c59e1a3aa"
                 data:
                   - title: "Item 1"

@@ -52,7 +52,7 @@ class Files extends Controller
             $data = $this->validateRequest($request, new Api\Schemas\UpdateFile);
             $updatedSchema = array_merge($schema, $data);
             $workspace->saveSchema($updatedSchema);
-            return $this->json($response, ['message' => 'File updated']);
+            return $this->json($response, $updatedSchema);
         } catch (\RuntimeException $e) {
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }
