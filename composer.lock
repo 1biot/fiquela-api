@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "1biot/fiquela",
-            "version": "v2.0.12",
+            "version": "v2.0.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/1biot/FiQueLa.git",
-                "reference": "973697530eb2e09eec08fe6e106f1e9e29cdbdac"
+                "reference": "3a7043cb66b0ae057d16f9e462206f144eb126ce"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/973697530eb2e09eec08fe6e106f1e9e29cdbdac",
-                "reference": "973697530eb2e09eec08fe6e106f1e9e29cdbdac",
+                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/3a7043cb66b0ae057d16f9e462206f144eb126ce",
+                "reference": "3a7043cb66b0ae057d16f9e462206f144eb126ce",
                 "shasum": ""
             },
             "require": {
@@ -53,9 +53,9 @@
             "description": "FiQueLa - File Query Language - PHP library for querying files",
             "support": {
                 "issues": "https://github.com/1biot/FiQueLa/issues",
-                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.12"
+                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.13"
             },
-            "time": "2025-04-22T09:10:16+00:00"
+            "time": "2025-04-22T10:23:47+00:00"
         },
         {
             "name": "contributte/psr11-container-interface",
