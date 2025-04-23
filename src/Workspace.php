@@ -180,9 +180,8 @@ class Workspace
     public function saveSchema(array &$schema): void
     {
         $fileName = $this->getSchemasPath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $schema['name']);
-        if ($this->extendsSchema($schema)) {
-            file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
-        }
+        $this->extendsSchema($schema);
+        file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
     }
 
     public function extendsSchema(array &$schema): bool
@@ -392,11 +391,15 @@ class Workspace
             return;
         }
 
-        $result = iterator_to_array($queryObject->execute()->getIterator());
-        file_put_contents(
-            $this->getQueryCacheFile($queryObject),
-            json_encode($result)
-        );
+        try {
+            $result = iterator_to_array($queryObject->execute()->getIterator());
+            file_put_contents(
+                $this->getQueryCacheFile($queryObject),
+                json_encode($result)
+            );
+        } catch (\Exception $e) {
+            trigger_error($e->getMessage(), E_USER_WARNING);
+        }
     }
 
     private function getQueryCacheFile(Interface\Query $queryObject): string

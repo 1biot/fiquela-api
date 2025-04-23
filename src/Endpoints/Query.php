@@ -41,7 +41,7 @@ class Query extends Controller
                 $response,
                 [
                     'query' => (string) $query,
-                    'file' => $originalFileQuery->file,
+                    'file' => $file,
                     'hash' => $originQueryHash,
                     'data' => iterator_to_array($cachedQuery->execute()->getIterator()),
                     'elapsed' => round(Debugger::timer('query') * 1000, 2), // in milliseconds
