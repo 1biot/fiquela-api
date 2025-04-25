@@ -509,6 +509,7 @@ class Workspace
     /**
      * @param array $data
      * @return Schema
+     * @throws InvalidFormatException
      */
     public function download(array $data): array
     {
@@ -517,7 +518,10 @@ class Workspace
             $data['url'],
             $this->getFilesPath() . DIRECTORY_SEPARATOR . $data['name']
         );
-        $format = $this->getFileTypeFromDownloadedFile($downloadedFile, [\FQL\Enum\Format::class, 'fromExtension']);
+        $format = $this->getFileTypeFromDownloadedFile($downloadedFile, function (string $extension) {
+            $extensionEnum = \FQL\Enum\Format::fromExtension($extension);
+            return $extensionEnum->value;
+        });
         $schema = $this->createSchemaFromDownloadedFile($downloadedFile, $format);
         $schema['encoding'] = $data['encoding'] ?? null;
         $schema['delimiter'] = $data['delimiter'] ?? null;
