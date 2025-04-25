@@ -1,11 +1,9 @@
 <?php
 declare(strict_types=1);
 
-use Tracy\Debugger;
-
 require __DIR__ . '/../vendor/autoload.php';
 
-Debugger::enable();
+Api\Bootstrap::initDebugger();
 Slim\Factory\AppFactory::setContainer(Api\Bootstrap::createContainer());
 $app = Slim\Factory\AppFactory::create();
 

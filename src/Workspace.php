@@ -15,6 +15,31 @@ use FQL\Stream;
 use Slim\Psr7\UploadedFile;
 use Symfony\Component\Uid\Uuid;
 
+/**
+ * @phpstan-type HistoryRow array{
+ *     date: string,
+ *     created_at: string,
+ *     query: string
+ * }
+ *
+ * @phpstan-type Column array{
+ *     column: string,
+ *     types: array<string>
+ * }
+ *
+ * @phpstan-type Schema array{
+ *     uuid: string,
+ *     originalName: string,
+ *     name: string,
+ *     type: string,
+ *     encoding: ?string,
+ *     size: int,
+ *     delimiter: ?string,
+ *     query: ?string,
+ *     count: int,
+ *     columns: array<string, Column>
+ * }
+*/
 class Workspace
 {
     private const string CachePath = 'cache';
@@ -101,6 +126,10 @@ class Workspace
         return [$queryObject, md5((string) $originalQuery), $originalFileQuery];
     }
 
+    /**
+     * @param Schema $schema
+     * @return string
+     */
     protected function schemaToFileQuery(array $schema): string
     {
         $fileQuery = '';
@@ -132,7 +161,10 @@ class Workspace
 
     public function addFileFromUploadedFile(UploadedFile $uploadedFile): array
     {
-        $format = $this->getFileTypeFromUploadedFile($uploadedFile, [\FQL\Enum\Format::class, 'fromExtension']);
+        $format = $this->getFileTypeFromUploadedFile($uploadedFile, function (string $extension) {
+            $extensionEnum = \FQL\Enum\Format::fromExtension($extension);
+            return $extensionEnum->value;
+        });
         $schema = $this->createSchemaFromUploadedFile($uploadedFile, $format);
         $moveToPath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
 
@@ -142,6 +174,11 @@ class Workspace
         return $schema;
     }
 
+    /**
+     * @param UploadedFile $uploadedFile
+     * @param Format $format
+     * @return Schema
+     */
     private function createSchemaFromUploadedFile(UploadedFile $uploadedFile, Format $format): array
     {
         return [
@@ -158,6 +195,11 @@ class Workspace
         ];
     }
 
+    /**
+     * @param \SplFileInfo $file
+     * @param Format $format
+     * @return Schema
+     */
     private function createSchemaFromDownloadedFile(\SplFileInfo $file, Format $format): array
     {
         return [
@@ -175,7 +217,7 @@ class Workspace
     }
 
     /**
-     * @param array $schema
+     * @param Schema $schema
      */
     public function saveSchema(array &$schema): void
     {
@@ -184,6 +226,10 @@ class Workspace
         file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
     }
 
+    /**
+     * @param Schema $schema
+     * @return bool
+     */
     public function extendsSchema(array &$schema): bool
     {
         $query = $schema['query'] ?? '';
@@ -250,6 +296,9 @@ class Workspace
         );
     }
 
+    /**
+     * @return Schema[]
+     */
     public function getFilesSchemas(): array
     {
         $schemas = [];
@@ -312,12 +361,6 @@ class Workspace
     }
 
     /**
-     * @phpstan-type HistoryRow array{
-     *     date: string,
-     *     created_at: string,
-     *     query: string
-     * }
-     *
      * @return HistoryRow[]
      * @throws FileNotFoundException
      * @throws InvalidFormatException
@@ -463,7 +506,11 @@ class Workspace
         return $safeExt ? "{$safeName}.{$safeExt}" : $safeName;
     }
 
-    public function download(object|array|null $data)
+    /**
+     * @param array $data
+     * @return Schema
+     */
+    public function download(array $data): array
     {
         $downloader = new Downloader();
         $downloadedFile = $downloader->downloadToFile(

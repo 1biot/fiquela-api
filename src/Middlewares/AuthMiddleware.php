@@ -8,9 +8,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
-class AuthMiddleware
+readonly class AuthMiddleware
 {
-    public function __construct(private readonly AuthenticatorFactory $factory) {}
+    public function __construct(private AuthenticatorFactory $factory) {}
 
     public function __invoke(Request $request, RequestHandlerInterface $handler): ResponseInterface
     {

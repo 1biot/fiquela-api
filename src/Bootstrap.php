@@ -7,9 +7,17 @@ use Nette;
 use Psr\Container;
 use Slim;
 use Slim\Interfaces\RouteCollectorProxyInterface;
+use Tracy\Debugger;
 
 class Bootstrap
 {
+    public static function initDebugger(): void
+    {
+        Debugger::$logDirectory = __DIR__ . "/../logs";
+        Debugger::$maxDepth = 4;
+        Debugger::enable(mode: Debugger::Detect, logDirectory: __DIR__ . '/../logs');
+    }
+
     public static function createContainer(): Container\ContainerInterface
     {
         $loader = new Nette\DI\ContainerLoader(__DIR__ . '/../temp', true);

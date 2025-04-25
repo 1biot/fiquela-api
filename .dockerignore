@@ -1,6 +1,7 @@
 .idea
 config/nginx
 http
+logs
 workspace
 vendor
 temp

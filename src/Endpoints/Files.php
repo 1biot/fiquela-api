@@ -5,7 +5,11 @@ namespace Api\Endpoints;
 use Api;
 use FQL;
 use Slim\Psr7;
+use Tracy\Debugger;
 
+/**
+ * @phpstan-import-type Schema from Api\Workspace
+ */
 class Files extends Controller
 {
     public function list(Psr7\Request $request, Psr7\Response $response): Psr7\Response
@@ -14,7 +18,8 @@ class Files extends Controller
             $workspace = $this->getWorkspace($request);
             return $this->json($response, $workspace->getFilesSchemas());
         } catch (\RuntimeException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 500);
+            Debugger::log($e, Debugger::ERROR);
+            return $this->json($response, ['error' => 'Could not list a files'], 500);
         }
     }
 
@@ -30,6 +35,7 @@ class Files extends Controller
 
             throw new \RuntimeException('Unsupported content type: ' . $insertType);
         } catch (\RuntimeException $e) {
+            Debugger::log($e, Debugger::ERROR);
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }
     }
@@ -38,7 +44,24 @@ class Files extends Controller
     {
         try {
             $workspace = $this->getWorkspace($request);
-            return $this->json($response, $this->validateFile($workspace, $args));
+            $schema = $this->validateFile($workspace, $args);
+            $raw = (bool) ($request->getQueryParams()['raw'] ?? null);
+            if (!$raw) {
+                return $this->json($response, $schema);
+            }
+
+            $filePath = $workspace->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
+            if (!file_exists($filePath)) {
+                return $this->json($response, ['error' => 'File not found'], 404);
+            }
+
+            $filename = $schema['originalName'] ?? $schema['name'];
+            return $response
+                ->withBody(new Psr7\Stream(fopen($filePath, 'rb')))
+                ->withHeader('Content-Type', 'application/octet-stream')
+                ->withHeader('Content-Disposition', 'attachment; filename="' . basename($filename) . '"')
+                ->withHeader('Content-Length', (string) filesize($filePath));
+
         } catch (\RuntimeException $e) {
             return $this->json($response, ['error' => $e->getMessage()], 404);
         }
@@ -74,8 +97,9 @@ class Files extends Controller
     }
 
     /**
+     * @throws \RuntimeException
      * @param array{uuid: ?string} $args
-     * @return array{uuid: string, name: string, type: string, size: int, delimiter: ?string, columns: array<string, string[]>}
+     * @return Schema
      */
     private function validateFile(Api\Workspace $workspace, array $args): array
     {
@@ -105,6 +129,7 @@ class Files extends Controller
                 ]
             );
         } catch (\Throwable $e) {
+            Debugger::log($e, Debugger::ERROR);
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }
     }
@@ -133,7 +158,8 @@ class Files extends Controller
             $schema = $workspace->download($this->validateRequest($request, new Api\Schemas\DownloadFile));
             return $this->json($response, ['schema' => $schema]);
         } catch (\Throwable $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 500);
+            Debugger::log($e, Debugger::ERROR);
+            return $this->json($response, ['error' => 'Could not download a file'], 500);
         }
     }
 }
