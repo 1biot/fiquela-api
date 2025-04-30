@@ -10,7 +10,7 @@ RUN apk add --no-cache \
     oniguruma-dev \
     && docker-php-ext-install intl zip pdo pdo_mysql opcache mbstring
 
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY config/docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 
 WORKDIR /app
 

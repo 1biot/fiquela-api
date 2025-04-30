@@ -7,11 +7,8 @@ spec:
         branch: main
         deploy_on_push: true
       name: fiquela-api
-      build_command:
-        - "mkdir ./temp ./logs ./workspace"
-        - "chown -R 1000:1000 ./temp ./logs ./workspace"
-        - "chmod -R 775 ./temp ./logs ./workspace"
-      run_command: "heroku-php-nginx -C ./docker/nginx/default.conf public/"
+      build_command: "mkdir ./temp ./logs ./workspace && chown -R 1000:1000 ./temp ./logs ./workspace && chmod -R 775 ./temp ./logs ./workspace"
+      run_command: "heroku-php-nginx -C ./config/do/nginx_app.conf public/"
       instance_count: 1
       instance_size_slug: basic-xxs
       envs:

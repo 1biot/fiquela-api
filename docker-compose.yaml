@@ -12,6 +12,6 @@ services:
     image: nginx:alpine
     container_name: fiquela-web
     volumes:
-      - ./docker/nginx:/etc/nginx/conf.d
+      - ./config/docker/nginx:/etc/nginx/conf.d
     depends_on:
       - app
