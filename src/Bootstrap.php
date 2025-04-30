@@ -23,7 +23,7 @@ class Bootstrap
         $loader = new Nette\DI\ContainerLoader(__DIR__ . '/../temp', true);
         self::loadEnvironmentVariables();
         $class = $loader->load(function($compiler) {
-            $compiler->loadConfig(__DIR__ . '/../config/config.neon');
+            $compiler->loadConfig(__DIR__ . '/../config/app/config.neon');
         });
 
         return new Contributte\Psr11\Container(new $class);
