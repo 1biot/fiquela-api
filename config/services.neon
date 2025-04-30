@@ -1,6 +1,7 @@
 services:
+    s3Sync: \Api\Storage\S3Sync(%workspaceS3%)
+    workspace: \Api\Workspace(%workspacePath%, @s3Sync)
     tokenAuthenticator: \Api\Auth\TokenAuthenticator(%apiKey%, @workspace)
-    workspace: \Api\Workspace(%workspacePath%)
     authenticatorFactory:
         class: \Api\Auth\AuthenticatorFactory()
         setup:

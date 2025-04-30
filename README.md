@@ -136,7 +136,7 @@ composer install && mkdir ./workspace ./temp
 cd ./public && php -S localhost:6917
 ```
 
-### 3. Build the API server
+### 4. Build the API server
 
 #### Localhost
 
@@ -163,6 +163,10 @@ docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d
 ```bash
 docker compose -f docker-compose.yaml -f docker-compose.clf.yaml up -d
 ```
+
+### 5. Digital Ocean
+
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/1biot/fiquela-api/tree/main)
 
 ---
 

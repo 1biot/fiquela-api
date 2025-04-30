@@ -5,5 +5,12 @@ includes:
 parameters:
     rootDir: ./..
     wwwDir: %rootDir%/public
-    workspacePath: %rootDir%/workspace
     apiKey: ::getenv(API_TOKEN)
+    workspacePath: %rootDir%/workspace
+    workspaceS3:
+        bucket: ::getenv(S3_BUCKET)
+        region: ::getenv(S3_REGION)
+        version: "latest"
+        key: ::getenv(S3_ACCESS_KEY)
+        secret: ::getenv(S3_SECRET_KEY)
+        endpoint: ::getenv(S3_ENDPOINT)

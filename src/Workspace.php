@@ -2,6 +2,7 @@
 
 namespace Api;
 
+use Api\Storage\S3Sync;
 use Api\Utils\Downloader;
 use FQL\Enum\Format;
 use FQL\Enum\Type;
@@ -48,18 +49,27 @@ class Workspace
     private const string SchemasPath = 'schemas';
 
     private readonly string $rootPath;
+    private readonly ?S3Sync $s3Sync;
 
-    public function __construct(string $rootPath)
+
+    public function __construct(string $rootPath, ?S3Sync $s3Sync = null)
     {
-        $this->rootPath = rtrim($rootPath, DIRECTORY_SEPARATOR);
-        if (is_writable($this->rootPath) === false) {
+        if (is_writable($rootPath) === false) {
             throw new \RuntimeException('Root path is not writable');
         }
 
-        $this->ensureDirectory($this->getCachePath());
-        $this->ensureDirectory($this->getFilesPath());
-        $this->ensureDirectory($this->getHistoryPath());
-        $this->ensureDirectory($this->getSchemasPath());
+        $this->rootPath = rtrim($rootPath, DIRECTORY_SEPARATOR);
+        $this->s3Sync = $s3Sync;
+
+        $this->initializeDirectories();
+
+        $this->initializeDirectories();
+
+        if ($this->shouldSynchronize()) {
+            $this->synchronizeWorkspace();
+        }
+
+        $this->validateWorkspace();
     }
 
     public function getCachePath(): string
@@ -170,6 +180,9 @@ class Workspace
 
         $uploadedFile->moveTo($moveToPath);
         chmod($moveToPath, 0644);
+
+        $this->s3Sync?->uploadFile($moveToPath, 'files/' . $schema['name']);
+
         $this->saveSchema($schema);
         return $schema;
     }
@@ -216,14 +229,12 @@ class Workspace
         ];
     }
 
-    /**
-     * @param Schema $schema
-     */
     public function saveSchema(array &$schema): void
     {
         $fileName = $this->getSchemasPath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $schema['name']);
         $this->extendsSchema($schema);
         file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
+        $this->s3Sync?->uploadSchema($schema, $this->getSchemasPath());
     }
 
     /**
@@ -353,11 +364,13 @@ class Workspace
         if (file_exists($filePath)) {
             unlink($filePath);
         }
+        $this->s3Sync?->deleteFile('files/' . $schema['name']);
 
         $schemaPath = $this->getSchemasPath() . DIRECTORY_SEPARATOR . $schema['name'] . '.json';
         if (file_exists($schemaPath)) {
             unlink($schemaPath);
         }
+        $this->s3Sync?->deleteFile('schemas/' . $schema['name'] . '.json');
     }
 
     /**
@@ -537,4 +550,93 @@ class Workspace
         return trim($queryString);
     }
 
+    private function isWorkspaceEmpty(): bool
+    {
+        return count(glob($this->getFilesPath() . '/*')) === 0 &&
+            count(glob($this->getSchemasPath() . '/*.json')) === 0;
+    }
+
+    private function getSyncMarkerPath(): string
+    {
+        return $this->getRootPath() . '/.fiquela.sync.ok';
+    }
+
+    private function generateWorkspaceFingerprint(): string
+    {
+        return md5(realpath($this->getRootPath()));
+    }
+
+    private function shouldSync(string $markerPath, array $current): bool
+    {
+        $saved = json_decode(@file_get_contents($markerPath), true);
+        return !$saved || $saved['workspace'] !== $current['workspace'] || $saved['s3'] !== $current['s3'];
+    }
+
+    private function initializeDirectories(): void
+    {
+        $this->ensureDirectory($this->getCachePath());
+        $this->ensureDirectory($this->getFilesPath());
+        $this->ensureDirectory($this->getHistoryPath());
+        $this->ensureDirectory($this->getSchemasPath());
+    }
+
+    private function validateWorkspace(): void
+    {
+        $markerFile = $this->getSyncMarkerPath();
+        if (!file_exists($markerFile)) {
+            foreach ($this->getFilesSchemas() as $schema) {
+                $filePath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
+
+                if (!file_exists($filePath)) {
+                    continue;
+                }
+
+                if (filesize($filePath) !== $schema['size']) {
+                    $this->extendsSchema($schema);
+                    $this->saveSchema($schema);
+                }
+            }
+
+            $this->writeSyncMarker();
+        }
+    }
+
+    private function writeSyncMarker(): void
+    {
+        $currentState = [
+            'workspace' => $this->generateWorkspaceFingerprint(),
+            's3' => $this->s3Sync?->getConfigFingerprint() ?? null,
+            'timestamp' => (new \DateTime())->format(\DateTime::ATOM)
+        ];
+
+        file_put_contents($this->getSyncMarkerPath(), json_encode($currentState));
+    }
+
+    private function synchronizeWorkspace(): void
+    {
+        if ($this->s3Sync) {
+            $this->isWorkspaceEmpty()
+                ? $this->s3Sync->syncFromBucket($this->rootPath)
+                : $this->s3Sync->syncToBucket($this->rootPath);
+        }
+    }
+
+    private function shouldSynchronize(): bool
+    {
+        $markerFile = $this->getSyncMarkerPath();
+        $currentState = [
+            'workspace' => $this->generateWorkspaceFingerprint(),
+            's3' => $this->s3Sync?->getConfigFingerprint() ?? null
+        ];
+
+        if (!file_exists($markerFile)) {
+            return true;
+        }
+
+        $saved = json_decode(@file_get_contents($markerFile), true);
+
+        return !$saved
+            || $saved['workspace'] !== $currentState['workspace']
+            || $saved['s3'] !== $currentState['s3'];
+    }
 }
