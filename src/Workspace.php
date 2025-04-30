@@ -15,6 +15,7 @@ use FQL\Sql;
 use FQL\Stream;
 use Slim\Psr7\UploadedFile;
 use Symfony\Component\Uid\Uuid;
+use Tracy\Debugger;
 
 /**
  * @phpstan-type HistoryRow array{
@@ -282,7 +283,8 @@ class Workspace
             }, array_keys($arrayKeys));
             $schema['count'] = $counter;
             return true;
-        } catch (\Exception) {
+        } catch (\Exception $e) {
+            Debugger::log($e, Debugger::ERROR);
             $schema['columns'] = [];
             $schema['count'] = 0;
             return false;
