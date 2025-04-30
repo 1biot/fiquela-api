@@ -255,22 +255,33 @@ class Workspace
             $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
             $counter = 0;
             $arrayKeys = [];
+
             foreach ($queryObject->selectAll()->execute(StreamResults::class)->getIterator() as $item) {
                 $counter++;
                 foreach (array_keys($item) as $key) {
-                    $type = Type::match($item[$key]);
-                    if ($type === Type::ARRAY && isset($item[$key]['@attributes']) && isset($item[$key]['value'])) {
-                        $type = Type::match($item[$key]['value']);
+                    $value = $item[$key];
+                    $type = Type::match($value);
+
+                    // XML: nested structure s '@attributes' a 'value'
+                    if ($type === Type::ARRAY && isset($value['@attributes']) && array_key_exists('value', $value)) {
+                        $type = Type::match($value['value']);
                         $key = $key . '.value';
+                        $value = $value['value'];
                     }
 
-                    if (isset($arrayKeys[$key]) === false) {
-                        $arrayKeys[$key] = [$type->value];
-                        continue;
+                    // Ensure an entry exists for the key
+                    if (!isset($arrayKeys[$key])) {
+                        $arrayKeys[$key] = [];
                     }
 
-                    if (in_array($type->value, $arrayKeys[$key], true) === false) {
+                    // Add type if not already recorded
+                    if (!in_array($type->value, $arrayKeys[$key], true)) {
                         $arrayKeys[$key][] = $type->value;
+                    }
+
+                    // Explicitly add 'null' if the value is null (and it's not already present)
+                    if ($value === null && !in_array('null', $arrayKeys[$key], true)) {
+                        $arrayKeys[$key][] = 'null';
                     }
                 }
             }
