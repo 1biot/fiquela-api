@@ -492,7 +492,7 @@ class Workspace
             'text/csv' => 'csv',
             'application/json' => 'jsonFile',
             'text/xml', 'application/xml' => 'xml',
-            'application/yaml' => 'yaml',
+            'application/yaml', 'text/yaml' => 'yaml',
             'application/neon' => 'neon',
             default => $fallback
                 ? $fallback(pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION))
