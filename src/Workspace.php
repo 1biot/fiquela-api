@@ -540,6 +540,7 @@ class Workspace
         $schema['delimiter'] = $data['delimiter'] ?? null;
         $schema['query'] = $data['query'] ?? null;
         chmod($downloadedFile, 0644);
+        $this->s3Sync?->uploadFile($downloadedFile, 'files/' . $schema['name']);
         $this->saveSchema($schema);
         return $schema;
     }
