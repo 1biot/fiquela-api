@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d90069d7e4d2f2025acc144980635617",
+    "content-hash": "a8b71c08504d333adf1577dd881c9f5e",
     "packages": [
         {
             "name": "1biot/fiquela",
-            "version": "v2.0.16",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/1biot/FiQueLa.git",
-                "reference": "a2c311a14b3bb94a444c1a2f4d86c13b053ab30c"
+                "reference": "f8bf08384e19c0db1baed9d7a3d00c1574137862"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/a2c311a14b3bb94a444c1a2f4d86c13b053ab30c",
-                "reference": "a2c311a14b3bb94a444c1a2f4d86c13b053ab30c",
+                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/f8bf08384e19c0db1baed9d7a3d00c1574137862",
+                "reference": "f8bf08384e19c0db1baed9d7a3d00c1574137862",
                 "shasum": ""
             },
             "require": {
@@ -40,6 +40,7 @@
                 "symfony/yaml": "^7.2",
                 "tracy/tracy": "^2.10"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -53,9 +54,9 @@
             "description": "FiQueLa - File Query Language - PHP library for querying files",
             "support": {
                 "issues": "https://github.com/1biot/FiQueLa/issues",
-                "source": "https://github.com/1biot/FiQueLa/tree/v2.0.16"
+                "source": "https://github.com/1biot/FiQueLa/tree/main"
             },
-            "time": "2025-05-02T14:52:56+00:00"
+            "time": "2025-05-07T15:03:30+00:00"
         },
         {
             "name": "aws/aws-crt-php",
@@ -113,16 +114,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.343.2",
+            "version": "3.343.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "95d43e71d3395622394b36079f2fb2289d3284b3"
+                "reference": "69b4b232072c4eb01f6701ba3f137728dc8c7aa8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/95d43e71d3395622394b36079f2fb2289d3284b3",
-                "reference": "95d43e71d3395622394b36079f2fb2289d3284b3",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/69b4b232072c4eb01f6701ba3f137728dc8c7aa8",
+                "reference": "69b4b232072c4eb01f6701ba3f137728dc8c7aa8",
                 "shasum": ""
             },
             "require": {
@@ -204,9 +205,9 @@
             "support": {
                 "forum": "https://github.com/aws/aws-sdk-php/discussions",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.343.2"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.343.5"
             },
-            "time": "2025-05-01T18:05:02+00:00"
+            "time": "2025-05-06T18:08:44+00:00"
         },
         {
             "name": "contributte/psr11-container-interface",
@@ -3050,7 +3051,9 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "1biot/fiquela": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
