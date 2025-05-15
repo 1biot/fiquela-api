@@ -269,29 +269,39 @@ class Workspace
                         $value = $value['value'];
                     }
 
-                    // Ensure an entry exists for the key
                     if (!isset($arrayKeys[$key])) {
                         $arrayKeys[$key] = [];
                     }
 
-                    // Add type if not already recorded
-                    if (!in_array($type->value, $arrayKeys[$key], true)) {
-                        $arrayKeys[$key][] = $type->value;
+                    $typeName = $value === null ? 'null' : $type->value;
+                    if (is_string($value)) {
+                        $trimmed = trim($value);
+                        if ($value === '') {
+                            $typeName = 'empty-string';
+                        } elseif ($trimmed === '') {
+                            $typeName = 'whitespace';
+                        } elseif (in_array(strtolower($value), ['yes', 'no'], true)) {
+                            $typeName = 'bool-string';
+                        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/', $value)) {
+                            $typeName = 'date-string';
+                        }
                     }
 
-                    // Explicitly add 'null' if the value is null (and it's not already present)
-                    if ($value === null && !in_array('null', $arrayKeys[$key], true)) {
-                        $arrayKeys[$key][] = 'null';
+                    if (!isset($arrayKeys[$key][$typeName])) {
+                        $arrayKeys[$key][$typeName] = 0;
                     }
+
+                    $arrayKeys[$key][$typeName]++;
                 }
             }
 
             $schema['columns'] = array_map(function ($key) use ($arrayKeys) {
                 return [
                     'column' => $key,
-                    'types' => $arrayKeys[$key]
+                    'types' => $arrayKeys[$key] // associative array: type => count
                 ];
             }, array_keys($arrayKeys));
+
             $schema['count'] = $counter;
             return true;
         } catch (\Exception $e) {
@@ -527,7 +537,7 @@ class Workspace
 
         // only ASCII at suffix
         $safeExt = preg_replace('/\W/', '', $ext);
-        $safeExt = mb_substr($safeExt, 0, 5);
+        $safeExt = mb_substr($safeExt, 0, 8);
 
         return $safeExt ? "{$safeName}.{$safeExt}" : $safeName;
     }

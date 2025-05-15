@@ -80,9 +80,9 @@ components:
               column:
                 type: "string"
               types:
-                type: "array"
-                items:
-                  type: "string"
+                type: "object"
+                additionalProperties:
+                  type: "number"
             required:
               - "column"
               - "types"
@@ -214,11 +214,16 @@ paths:
                   count: 100
                   columns:
                     - column: "title"
-                      types: ["string"]
+                      types:
+                        string: 23
+                        empty-string: 12
                     - column: "images"
-                      types: ["array"]
+                      types:
+                        array: 234
                     - column: "price"
-                      types: ["double"]
+                      types:
+                        int: 98
+                        double: 12
 
       summary: Upload file from remote URL or local file
   /api/v1/files/{uuid}:
@@ -249,11 +254,16 @@ paths:
                 count: 100
                 columns:
                   - column: "title"
-                    types: ["string"]
+                    types:
+                      string: 23
+                      empty-string: 12
                   - column: "images"
-                    types: ["array"]
+                    types:
+                      array: 234
                   - column: "price"
-                    types: ["double"]
+                    types:
+                      int: 98
+                      double: 12
       summary: Get file schema or info
     post:
       tags:
@@ -290,11 +300,16 @@ paths:
                   count: 100
                   columns:
                     - column: "title"
-                      types: ["string"]
+                      types:
+                        string: 23
+                        empty-string: 12
                     - column: "images"
-                      types: ["array"]
+                      types:
+                        array: 234
                     - column: "price"
-                      types: ["double"]
+                      types:
+                        int: 98
+                        double: 12
       summary: Generate query-based export for file
     delete:
       tags:
