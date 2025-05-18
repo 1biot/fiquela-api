@@ -2,6 +2,8 @@
 
 namespace Api;
 
+use Api\Renderers\ErrorRenderer;
+use Api\Utils\TracyPsrLogger;
 use Contributte;
 use Nette;
 use Psr\Container;
@@ -14,8 +16,13 @@ class Bootstrap
     public static function initDebugger(): void
     {
         Debugger::$logDirectory = __DIR__ . "/../logs";
-        Debugger::$maxDepth = 4;
         Debugger::enable(mode: Debugger::Detect, logDirectory: __DIR__ . '/../logs');
+
+        Debugger::$showBar = false;
+        Debugger::$strictMode = Debugger::$productionMode === Debugger::Development
+            ? true
+            : (E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+        Debugger::$scream = Debugger::$productionMode === Debugger::Development;
     }
 
     public static function createContainer(): Container\ContainerInterface
@@ -65,5 +72,19 @@ class Bootstrap
                 return $response;
             });
         })->add(Middlewares\AuthMiddleware::class);
+    }
+
+    public static function addErrorMiddleware(Slim\App $app): void
+    {
+        $errorMiddleware = $app->addErrorMiddleware(
+            Debugger::$productionMode === Debugger::Development,
+            Debugger::$productionMode === Debugger::Production,
+            Debugger::$productionMode === Debugger::Production,
+            new TracyPsrLogger(Debugger::getLogger())
+        );
+
+        $errorHandler = $errorMiddleware->getDefaultErrorHandler();
+        $errorHandler->registerErrorRenderer('application/json', ErrorRenderer::class);
+        $errorHandler->forceContentType('application/json');
     }
 }

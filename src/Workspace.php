@@ -296,14 +296,47 @@ class Workspace
             }
 
             $schema['columns'] = array_map(function ($key) use ($arrayKeys) {
+                $emptyTypes = ['null', 'empty-string', 'whitespace'];
+                $types = $arrayKeys[$key];
+                $typeEntries = $types;
+
+                $total = array_sum($typeEntries);
+                $filledCount = array_sum(array_filter(
+                    $typeEntries,
+                    fn($count, $type) => !in_array($type, $emptyTypes, true),
+                    ARRAY_FILTER_USE_BOTH
+                ));
+                $totalTypes = count($typeEntries);
+
+                // dominant type
+                arsort($typeEntries);
+                $dominantType = $typeEntries ? array_key_first($typeEntries) : null;
+
+                $allTypeKeys = array_keys($typeEntries);
+                $filteredEmptyTypes = array_filter($allTypeKeys, fn($type) => in_array($type, $emptyTypes, true));
+                $nonEmptyTypes = array_diff($allTypeKeys, $filteredEmptyTypes);
+
+                $isNumericCombo = in_array('int', $nonEmptyTypes, true)
+                    && in_array('double', $nonEmptyTypes, true)
+                    && count($nonEmptyTypes) === 2;
+
+                $suspicious = count($filteredEmptyTypes) > 1
+                    || (count($nonEmptyTypes) > 1 && !$isNumericCombo)
+                    || ($isNumericCombo && count($filteredEmptyTypes) > 1);
+
                 return [
                     'column' => $key,
-                    'types' => $arrayKeys[$key] // associative array: type => count
+                    'types' => $types,
+                    'totalRows' => $filledCount,
+                    'totalTypes' => $totalTypes,
+                    'dominant' => $dominantType,
+                    'suspicious' => $suspicious
                 ];
             }, array_keys($arrayKeys));
 
             $schema['count'] = $counter;
             return true;
+
         } catch (\Exception $e) {
             Debugger::log($e, Debugger::ERROR);
             $schema['columns'] = [];
@@ -311,6 +344,7 @@ class Workspace
             return false;
         }
     }
+
 
     public function logQuery(string $query, ?Interface\Query $queryObject = null): void
     {

@@ -9,6 +9,5 @@ $app = Slim\Factory\AppFactory::create();
 
 $app->addBodyParsingMiddleware();
 Api\Bootstrap::addRouting($app);
-$app->addErrorMiddleware(false, true, true);
-
+Api\Bootstrap::addErrorMiddleware($app);
 $app->run();

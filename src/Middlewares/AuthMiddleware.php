@@ -5,8 +5,8 @@ namespace Api\Middlewares;
 use Api\Auth\AuthenticatorFactory;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Slim\Exception\HttpUnauthorizedException;
 use Slim\Psr7\Request;
-use Slim\Psr7\Response;
 
 readonly class AuthMiddleware
 {
@@ -16,9 +16,7 @@ readonly class AuthMiddleware
     {
         $workspace = $this->factory->authenticate($request);
         if (!$workspace) {
-            $res = new Response();
-            $res->getBody()->write(json_encode(['error' => 'Unauthorized']));
-            return $res->withHeader('Content-Type', 'application/json')->withStatus(401);
+            throw new HttpUnauthorizedException($request);
         }
 
         return $handler->handle($request->withAttribute('workspace', $workspace));

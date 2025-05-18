@@ -54,6 +54,5 @@ class History extends Controller
                 500
             );
         }
-
     }
 }
