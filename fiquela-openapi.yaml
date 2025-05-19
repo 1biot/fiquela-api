@@ -83,9 +83,22 @@ components:
                 type: "object"
                 additionalProperties:
                   type: "number"
+              totalRows:
+                type: "integer"
+              totalTypes:
+                type: "integer"
+              dominant:
+                type: "string"
+                nullable: true
+              suspicious:
+                type: "boolean"
             required:
               - "column"
               - "types"
+              - "totalRows"
+              - "totalTypes"
+              - "dominant"
+              - "suspicious"
             additionalProperties: false
       additionalProperties: false
     FilesSchema:

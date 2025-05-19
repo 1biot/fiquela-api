@@ -26,7 +26,11 @@ use Tracy\Debugger;
  *
  * @phpstan-type Column array{
  *     column: string,
- *     types: array<string>
+ *     types: array<string>,
+ *     totalRows: int,
+ *     totalTypes: int,
+ *     dominant: ?string,
+ *     suspicious: bool
  * }
  *
  * @phpstan-type Schema array{
@@ -39,7 +43,7 @@ use Tracy\Debugger;
  *     delimiter: ?string,
  *     query: ?string,
  *     count: int,
- *     columns: array<string, Column>
+ *     columns: Column[]
  * }
 */
 class Workspace
