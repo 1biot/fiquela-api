@@ -64,8 +64,6 @@ class Workspace
 
         $this->initializeDirectories();
 
-        $this->initializeDirectories();
-
         if ($this->shouldSynchronize()) {
             $this->synchronizeWorkspace();
         }

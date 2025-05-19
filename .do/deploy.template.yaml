@@ -15,6 +15,10 @@ spec:
         - key: API_TOKEN
           scope: RUN_TIME
           type: SECRET
+        - key: S3_ENABLED
+          scope: RUN_TIME
+          type: SECRET
+          value: "0"
         - key: S3_BUCKET
           scope: RUN_TIME
           type: SECRET

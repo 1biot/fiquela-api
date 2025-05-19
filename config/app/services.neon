@@ -1,6 +1,6 @@
 services:
-    s3Sync: \Api\Storage\S3Sync(%workspaceS3%)
-    workspace: \Api\Workspace(%workspacePath%, @s3Sync)
+    S3SyncFactory: \Api\Storage\S3SyncFactory(%workspaceS3%)
+    workspace: \Api\Workspace(%workspacePath%, @S3SyncFactory::create())
     tokenAuthenticator: \Api\Auth\TokenAuthenticator(%apiKey%, @workspace)
     authenticatorFactory:
         class: \Api\Auth\AuthenticatorFactory()

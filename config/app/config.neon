@@ -8,6 +8,7 @@ parameters:
     apiKey: ::getenv(API_TOKEN)
     workspacePath: %rootDir%/workspace
     workspaceS3:
+        enabled: ::getenv(S3_ENABLED)
         bucket: ::getenv(S3_BUCKET)
         region: ::getenv(S3_REGION)
         version: "latest"
