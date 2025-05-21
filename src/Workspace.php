@@ -55,7 +55,7 @@ class Workspace
 
     private readonly string $rootPath;
     private readonly ?S3Sync $s3Sync;
-
+    private ?string $uuid = null;
 
     public function __construct(string $rootPath, ?S3Sync $s3Sync = null)
     {
@@ -66,6 +66,7 @@ class Workspace
         $this->rootPath = rtrim($rootPath, DIRECTORY_SEPARATOR);
         $this->s3Sync = $s3Sync;
 
+        $this->initializeWorkspaceUuid();
         $this->initializeDirectories();
 
         if ($this->shouldSynchronize()) {
@@ -73,6 +74,15 @@ class Workspace
         }
 
         $this->validateWorkspace();
+    }
+
+    public function getId(): string
+    {
+        if ($this->uuid === null) {
+            $this->uuid = file_get_contents($this->getUuidPath());
+        }
+
+        return $this->uuid;
     }
 
     public function getCachePath(): string
@@ -257,14 +267,24 @@ class Workspace
             $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
             $counter = 0;
             $arrayKeys = [];
+            $colEnumCheck = [];
 
             foreach ($queryObject->selectAll()->execute(StreamResults::class)->getIterator() as $item) {
                 $counter++;
+
+                foreach (array_keys($arrayKeys) as $knownKey) {
+                    if (!array_key_exists($knownKey, $item)) {
+                        if (!isset($arrayKeys[$knownKey]['null'])) {
+                            $arrayKeys[$knownKey]['null'] = 0;
+                        }
+                        $arrayKeys[$knownKey]['null']++;
+                    }
+                }
+
                 foreach (array_keys($item) as $key) {
                     $value = $item[$key];
                     $type = Type::match($value);
 
-                    // XML: nested structure s '@attributes' a 'value'
                     if ($type === Type::ARRAY && isset($value['@attributes']) && array_key_exists('value', $value)) {
                         $type = Type::match($value['value']);
                         $key = $key . '.value';
@@ -294,10 +314,33 @@ class Workspace
                     }
 
                     $arrayKeys[$key][$typeName]++;
+
+                    // Enum sample – only for scalar non-empty values
+                    if (!isset($colEnumCheck[$key])) {
+                        $colEnumCheck[$key] = [];
+                    }
+
+                    if (is_array($colEnumCheck[$key]) && is_scalar($value)) {
+                        $stringValue = (string)$value;
+
+                        // ignore null, '' or whitespace
+                        if ($stringValue !== '' && trim($stringValue) !== '') {
+                            $colEnumCheck[$key][$stringValue] = ($colEnumCheck[$key][$stringValue] ?? 0) + 1;
+
+                            // as soon as it exceeds 5 uniques – discard
+                            if (count($colEnumCheck[$key]) > 5) {
+                                unset($colEnumCheck[$key]);
+                            }
+                        }
+                    } elseif (is_array($colEnumCheck[$key])) {
+                        // noscalar -> discard
+                        unset($colEnumCheck[$key]);
+                    }
+
                 }
             }
 
-            $schema['columns'] = array_map(function ($key) use ($arrayKeys) {
+            $schema['columns'] = array_map(function ($key) use ($arrayKeys, $colEnumCheck, $counter) {
                 $emptyTypes = ['null', 'empty-string', 'whitespace'];
                 $types = $arrayKeys[$key];
                 $typeEntries = $types;
@@ -310,7 +353,6 @@ class Workspace
                 ));
                 $totalTypes = count($typeEntries);
 
-                // dominant type
                 arsort($typeEntries);
                 $dominantType = $typeEntries ? array_key_first($typeEntries) : null;
 
@@ -323,8 +365,31 @@ class Workspace
                     && count($nonEmptyTypes) === 2;
 
                 $suspicious = count($filteredEmptyTypes) > 1
-                    || (count($nonEmptyTypes) > 1 && !$isNumericCombo)
-                    || ($isNumericCombo && count($filteredEmptyTypes) > 1);
+                    || (count($nonEmptyTypes) > 1 && !$isNumericCombo);
+
+                $confidence = $total > 0 ? ($typeEntries[$dominantType] / $total) : 0.0;
+                $missingCount = array_sum(array_intersect_key($typeEntries, array_flip($emptyTypes)));
+                $completeness = $counter > 0 ? (($counter - $missingCount) / $counter) : 0.0;
+
+                $enumSet = $colEnumCheck[$key] ?? null;
+
+                $isEnum = false;
+                $isConstant = false;
+
+                if (is_array($enumSet)) {
+                    $uniqueCount = count($enumSet);
+                    $occurrenceCount = array_sum($enumSet);
+
+                    // constant = 1 value, which occurs in all rows where there was a non-empty value
+                    if ($uniqueCount === 1 && $occurrenceCount === $filledCount) {
+                        $isConstant = true;
+                    }
+
+                    // enum = 2-5 various values that COVER THE ENTIRE column (all rows where there is no null)
+                    elseif ($uniqueCount >= 2 && $uniqueCount <= 5 && $occurrenceCount === $filledCount && $completeness > 0.1) {
+                        $isEnum = true;
+                    }
+                }
 
                 return [
                     'column' => $key,
@@ -332,7 +397,11 @@ class Workspace
                     'totalRows' => $filledCount,
                     'totalTypes' => $totalTypes,
                     'dominant' => $dominantType,
-                    'suspicious' => $suspicious
+                    'suspicious' => $suspicious,
+                    'confidence' => round($confidence, 4),
+                    'completeness' => round($completeness, 4),
+                    'constant' => $isConstant,
+                    'isEnum' => $isEnum,
                 ];
             }, array_keys($arrayKeys));
 
@@ -346,7 +415,6 @@ class Workspace
             return false;
         }
     }
-
 
     public function logQuery(string $query, ?Interface\Query $queryObject = null): void
     {
@@ -616,6 +684,11 @@ class Workspace
             count(glob($this->getSchemasPath() . '/*.json')) === 0;
     }
 
+    private function getUuidPath(): string
+    {
+        return $this->getRootPath() . DIRECTORY_SEPARATOR . '.fiquela.uuid';
+    }
+
     private function getSyncMarkerPath(): string
     {
         return $this->getRootPath() . '/.fiquela.sync.ok';
@@ -642,11 +715,14 @@ class Workspace
 
     private function validateWorkspace(): void
     {
+        if (file_exists($this->getUuidPath()) === false) {
+            throw new \RuntimeException('Workspace UUID file not found');
+        }
+
         $markerFile = $this->getSyncMarkerPath();
         if (!file_exists($markerFile)) {
             foreach ($this->getFilesSchemas() as $schema) {
                 $filePath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
-
                 if (!file_exists($filePath)) {
                     continue;
                 }
@@ -658,6 +734,15 @@ class Workspace
             }
 
             $this->writeSyncMarker();
+        }
+    }
+
+    private function initializeWorkspaceUuid(): void
+    {
+        $uuidPath = $this->getUuidPath();
+        if (!file_exists($uuidPath)) {
+            $uuid = Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_URL), md5($this->getRootPath()));
+            file_put_contents($uuidPath, $uuid->toRfc4122());
         }
     }
 

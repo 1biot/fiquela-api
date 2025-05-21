@@ -12,10 +12,13 @@ class CorsMiddleware implements Http\Server\MiddlewareInterface
         Http\Server\RequestHandlerInterface $handler
     ): Http\Message\ResponseInterface
     {
-        $origin = $request->getHeaderLine('Origin') ?? '*';
+        $origin = $request->getHeaderLine('Origin');
+        $origin = $origin !== '' ? $origin : '*';
 
         if ($request->getMethod() === 'OPTIONS') {
-            return $this->applyCorsHeaders(new Psr7\Response(), $origin);
+            return $this
+                ->applyCorsHeaders(new Psr7\Response(204), $origin)
+                ->withHeader('Content-Length', '0');
         }
 
         $response = $handler->handle($request);

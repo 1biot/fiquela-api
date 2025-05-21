@@ -17,12 +17,17 @@
     "guzzlehttp/guzzle": "^7.9",
     "vlucas/phpdotenv": "^5.6",
     "league/flysystem-aws-s3-v3": "^3.0",
-    "aws/aws-sdk-php": "^3.0"
+    "aws/aws-sdk-php": "^3.0",
+    "firebase/php-jwt": "^6.11"
   },
   "minimum-stability": "stable",
   "autoload": {
     "psr-4": {
       "Api\\": "./src/"
     }
+  },
+  "scripts": {
+    "openapi:open": "npm run openapi:open",
+    "passwd:generate": "./bin/generate-password"
   }
 }

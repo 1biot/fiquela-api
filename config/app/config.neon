@@ -1,17 +1,12 @@
-includes:
-    - services.neon
-
-
 parameters:
     rootDir: ./..
     wwwDir: %rootDir%/public
     apiKey: ::getenv(API_TOKEN)
+    apiUsername: ::getenv(API_USER)
+    apiPasswordHash: ::getenv(API_PASSWORD_HASH)
     workspacePath: %rootDir%/workspace
-    workspaceS3:
-        enabled: ::getenv(S3_ENABLED)
-        bucket: ::getenv(S3_BUCKET)
-        region: ::getenv(S3_REGION)
-        version: "latest"
-        key: ::getenv(S3_ACCESS_KEY)
-        secret: ::getenv(S3_SECRET_KEY)
-        endpoint: ::getenv(S3_ENDPOINT)
+
+
+includes:
+    - s3.neon
+    - services.neon

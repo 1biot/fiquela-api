@@ -1,0 +1,15 @@
+{
+  "name": "fiquela-api",
+  "version": "1.0.0",
+  "description": "**Version:** 1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "openapi:open": "swagger-ui-watcher fiquela-openapi.yaml --no-open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "swagger-ui-watcher": "^2.1.14"
+  }
+}

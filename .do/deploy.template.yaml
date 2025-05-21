@@ -12,7 +12,10 @@ spec:
       instance_count: 1
       instance_size_slug: basic-xxs
       envs:
-        - key: API_TOKEN
+        - key: API_USER
+          scope: RUN_TIME
+          type: SECRET
+        - key: API_PASSWORD_HASH
           scope: RUN_TIME
           type: SECRET
         - key: S3_ENABLED

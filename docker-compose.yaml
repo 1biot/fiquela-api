@@ -2,8 +2,6 @@ services:
   app:
     build:
       context: .
-      args:
-        API_TOKEN: ${API_TOKEN}
     container_name: fiquela-api
     expose:
       - "9000"

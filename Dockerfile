@@ -40,8 +40,11 @@ RUN mkdir -p /app/temp && \
     chown -R www-data:www-data /app/temp /app/logs && \
     chmod -R 775 /app/temp /app/logs
 
-ARG API_TOKEN
-ENV API_TOKEN=${API_TOKEN}
+ARG API_USERNAME
+ENV API_USERNAME=${API_USERNAME}
+
+ARG API_PASSWORD_HASH
+ENV API_PASSWORD_HASH=${API_PASSWORD_HASH}
 
 ARG S3_BUCKET
 ENV S3_BUCKET=${S3_BUCKET}

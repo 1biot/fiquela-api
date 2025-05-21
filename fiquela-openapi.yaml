@@ -5,9 +5,11 @@ openapi: 3.0.3
 servers:
   - url: http://localhost:6917
     description: Local server
-  - url: https:/fiquela.preved.to
+  - url: https://fiquela.preved.to
     description: Online test server
 tags:
+  - name: Auth
+    description: Authentication operations
   - name: Files
     description: File management operations
   - name: Query
@@ -17,7 +19,33 @@ components:
     bearerAuth:
       scheme: bearer
       type: http
+  headers:
+    ApiVersionHeader:
+      description: Version of the API that processed the request
+      schema:
+        type: string
+        example: "v1"
   schemas:
+    AuthRequest:
+      type: object
+      properties:
+        user:
+          type: string
+          example: novak
+        secret:
+          type: string
+          example: SuperSecret123!
+      required:
+        - user
+        - secret
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6...
+      required:
+        - token
     UploadSchema:
       type: object
       properties:
@@ -172,22 +200,81 @@ components:
           type: integer
         offset:
           type: integer
-security:
-  - bearerAuth: []
 paths:
+  /api/auth/login:
+    post:
+      security: []
+      tags:
+        - Auth
+      summary: Login and get token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Successful login
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+  /api/auth/revoke:
+    post:
+      security: []
+      tags:
+        - Auth
+      summary: Revoke token and get a new one
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Token revoked, new one returned
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revoked:
+                    type: string
+                    example: eyJhbGciOiJIUz...
+                required:
+                  - revoked
+        '401':
+          description: Invalid credentials
   /api/v1/files:
     get:
+      security:
+        - bearerAuth: []
       tags:
         - Files
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/FilesSchema'
       summary: List of files
     post:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Files
       requestBody:
@@ -208,6 +295,9 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -241,6 +331,8 @@ paths:
       summary: Upload file from remote URL or local file
   /api/v1/files/{uuid}:
     get:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Files
       parameters:
@@ -252,6 +344,9 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -270,6 +365,14 @@ paths:
                     types:
                       string: 23
                       empty-string: 12
+                    totalRows: 35
+                    totalTypes: 2
+                    dominant: "string"
+                    suspicious: false
+                    confidence: 0.95
+                    completeness: 0.98
+                    constant: false
+                    isEnum: false
                   - column: "images"
                     types:
                       array: 234
@@ -277,10 +380,26 @@ paths:
                     types:
                       int: 98
                       double: 12
+                    totalRows: 110
+                    totalTypes: 2
+                    dominant: "int"
+                    suspicious: false
+                    confidence: 0.95
+                    completeness: 0.98
+                    constant: false
+                    isEnum: false
       summary: Get file schema or info
     post:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Files
+      parameters:
+        - in: path
+          name: uuid
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -294,6 +413,9 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -325,11 +447,22 @@ paths:
                         double: 12
       summary: Generate query-based export for file
     delete:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Files
+      parameters:
+        - in: path
+          name: uuid
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -343,6 +476,8 @@ paths:
       summary: Generate query-based export for file
   /api/v1/query:
     post:
+      security:
+        - bearerAuth: [ ]
       summary: Execute SQL-like queries over the files and get results
       tags:
         - Query
@@ -369,6 +504,9 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -391,6 +529,8 @@ paths:
                   offset: 0
   /api/v1/export/{hash}:
     get:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Export
       parameters:
@@ -411,14 +551,22 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
       summary: Export a file in specific format
   /api/v1/history:
     get:
+      security:
+        - bearerAuth: [ ]
       tags:
         - History
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -446,6 +594,8 @@ paths:
       summary: List of file processing history
   /api/v1/history/{date}:
     get:
+      security:
+        - bearerAuth: [ ]
       tags:
         - History
       parameters:
@@ -459,6 +609,9 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             application/json:
               schema:
@@ -486,11 +639,16 @@ paths:
       summary: List of file processing history
   /api/v1/ping:
     get:
+      security:
+        - bearerAuth: [ ]
       tags:
         - Health
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
           content:
             text/plain:
               example: "pong"

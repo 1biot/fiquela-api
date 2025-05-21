@@ -39,26 +39,49 @@ making it ideal for applications dealing with dynamic data imports, exports, and
 
 ### Authentication
 
+#### Login
+
+To authenticate, send a `POST` request to `/api/auth/login` with your credentials:
+
+```http request
+POST /api/auth/login
+
+{
+  "username": "your_username",
+  "password": "your_password"
+}
+```
+
+Response:
+
+```json
+{
+  "token": "your_jwt_token"
+}
+```
+
+### Endpoints
+
 All endpoints are secured via `Bearer Authentication`. Obtain a valid token and include it in the header:
 
 ```http
 Authorization: Bearer <your_token>
 ```
 
-### Endpoints
-
-| Endpoint                   | Method   | Description                         |
-|----------------------------| -------- | ----------------------------------- |
-| `/api/v1/files`            | `GET`    | List all files                      |
-| `/api/v1/files`            | `POST`   | Upload a file                       |
-| `/api/v1/files/{uuid}`     | `GET`    | Get file details and schema         |
-| `/api/v1/files/{uuid}`     | `POST`   | Update file details and export data |
-| `/api/v1/files/{uuid}`     | `DELETE` | Delete file                         |
-| `/api/v1/query`            | `POST`   | Execute SQL-like queries            |
-| `/api/v1/export/{hash}`    | `GET`    | Export data in specified format     |
-| `/api/v1/history`          | `GET`    | Get query history                   |
-| `/api/v1/history/{date}`   | `GET`    | Get query history by date           |
-| `/api/v1/ping`             | `GET`    | API Health Check                    |
+| Endpoint                 | Method   | Description                         |
+|--------------------------| -------- | ----------------------------------- |
+| `/api/auth/login`        | `POST`   | Authenticate and get token          |
+| `/api/auth/revoke`       | `POST`   | Revoke token                        |
+| `/api/v1/files`          | `GET`    | List all files                      |
+| `/api/v1/files`          | `POST`   | Upload a file                       |
+| `/api/v1/files/{uuid}`   | `GET`    | Get file details and schema         |
+| `/api/v1/files/{uuid}`   | `POST`   | Update file details and export data |
+| `/api/v1/files/{uuid}`   | `DELETE` | Delete file                         |
+| `/api/v1/query`          | `POST`   | Execute SQL-like queries            |
+| `/api/v1/export/{hash}`  | `GET`    | Export data in specified format     |
+| `/api/v1/history`        | `GET`    | Get query history                   |
+| `/api/v1/history/{date}` | `GET`    | Get query history by date           |
+| `/api/v1/ping`           | `GET`    | API Health Check                    |
 
 ---
 
@@ -115,16 +138,48 @@ cd fiquela-api
 touch .env
 ```
 
-put your `API_TOKEN` to `.env` file. You can create a random token using the following command:
+#### 🔐 Credentials
+
+put your credentials to the `.env` file. You can create a random password using the following command:
 
 ```bash
-echo "API_TOKEN=$(openssl rand -hex 32)" >> .env
+composer passwd:generate 32
 ```
 
-Final setup should look like this:
+Generates a random password of 32 characters.
+
+```text
+5M5Dk!q1E8nE6w054J3fetruPLUXee20
+$2y$10$cSjiZDZ.qoHBmNbXeBMJvutUtDQHqryy1e3.NrIjhE7ZXR4FoFwT6
+```
+
+Final `.env` file should look like this:
 
 ```bash
-API_TOKEN=da3f318b3286de70700abd7340e0b4117d43a80e8130caf532da3cc732128d80
+API_USER="your-username"
+API_PASSWORD_HASH="$2y$10$cSjiZDZ..."
+```
+
+#### 💾 S3 backup configuration
+
+If you want to use S3 for backup your workspace data you can set the following environment variables in your `.env` file:
+
+```bash
+S3_ENABLED=1
+S3_BUCKET="your-bucket-name"
+S3_REGION="auto"
+S3_ENDPOINT="https://3nd901nth45h.r2.cloudflarestorage.com"
+S3_ACCESS_KEY="4cc35k3y"
+S3_SECRET_KEY="53cr3tk3y"
+```
+
+I recommend using [Cloudflare R2](https://www.cloudflare.com/r2/) for S3 storage, as it is free for the first 10GB
+of data and 1 million requests per month. Be free to use any other S3-compatible storage provider.
+
+If you don't want to use S3 for backup, you can set the following environment variable in your `.env` file:
+
+```bash
+S3_ENABLED=0
 ```
 
 ### 3. Without docker
@@ -150,7 +205,7 @@ docker compose -f docker-compose.yaml -f docker-compose.dev.yaml build
 docker compose -f docker-compose.yaml -f docker-compose.clf.yaml build
 ```
 
-### 4. Launch the API server
+### 5. Launch the API server
 
 #### Localhost
 
@@ -164,9 +219,9 @@ docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d
 docker compose -f docker-compose.yaml -f docker-compose.clf.yaml up -d
 ```
 
-### 5. Digital Ocean
+### 6. Digital Ocean
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/1biot/fiquela-api/tree/main)
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/1biot/fiquela-api/tree/main?refcode=92025543cb9f)
 
 ---
 

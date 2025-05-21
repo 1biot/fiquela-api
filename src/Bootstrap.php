@@ -52,26 +52,40 @@ class Bootstrap
             return $response;
         });
 
-        $app->group('/api/v1', function (RouteCollectorProxyInterface $group) {
-            $group->get('/files', [Endpoints\Files::class, 'list']);
-            $group->post('/files', [Endpoints\Files::class, 'insert']);
+        $app->group('/api', function (RouteCollectorProxyInterface $apiGroup) {
+            $apiGroup->group('/auth', function (RouteCollectorProxyInterface $authGroup) {
+                $authGroup->post('/login', [Endpoints\Auth::class, 'login']);
+                $authGroup->post('/revoke', [Endpoints\Auth::class, 'revoke']);
+            })->add(Middlewares\ApiVersionHeaderMiddleware::class);
 
-            $group->get('/files/{uuid}', [Endpoints\Files::class, 'detail']);
-            $group->post('/files/{uuid}', [Endpoints\Files::class, 'update']);
-            $group->delete('/files/{uuid}', [Endpoints\Files::class, 'delete']); // in progress
+            $version = self::getVersion();
+            $apiGroup->group(
+                self::getVersionEndpoint($version),
+                function(RouteCollectorProxyInterface $versionGroup) use ($version) {
+                    $versionGroup->get('/files', [Endpoints\Files::class, 'list']);
+                    $versionGroup->post('/files', [Endpoints\Files::class, 'insert']);
 
-            $group->post('/query', Endpoints\Query::class);
+                    $versionGroup->get('/files/{uuid}', [Endpoints\Files::class, 'detail']);
+                    $versionGroup->post('/files/{uuid}', [Endpoints\Files::class, 'update']);
+                    $versionGroup->delete('/files/{uuid}', [Endpoints\Files::class, 'delete']); // in progress
 
-            $group->get('/history[/{date:\d{4}-\d{2}-\d{2}}]', Endpoints\History::class);
+                    $versionGroup->post('/query', Endpoints\Query::class);
+                    $versionGroup->get('/export/{hash}', Endpoints\Export::class);
 
-            $group->get('/export/{hash}', Endpoints\Export::class);
+                    $versionGroup->get('/history[/{date:\d{4}-\d{2}-\d{2}}]', Endpoints\History::class);
 
-            $group->get('/ping', function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
-                $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
-                $response->getBody()->write('pong');
-                return $response;
-            });
-        })->add(Middlewares\AuthMiddleware::class);
+                    $versionGroup->get(
+                        '/ping',
+                        function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
+                            $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
+                            $response->getBody()->write('pong');
+                            return $response;
+                        }
+                    );
+                }
+            )->add(Middlewares\ApiVersionHeaderMiddleware::class)
+                ->add(Middlewares\AuthMiddleware::class);
+        });
     }
 
     public static function addErrorMiddleware(Slim\App $app): void
@@ -86,5 +100,15 @@ class Bootstrap
         $errorHandler = $errorMiddleware->getDefaultErrorHandler();
         $errorHandler->registerErrorRenderer('application/json', ErrorRenderer::class);
         $errorHandler->forceContentType('application/json');
+    }
+
+    public static function getVersion(): string
+    {
+        return 'v1';
+    }
+
+    private static function getVersionEndpoint(string $version): string
+    {
+        return sprintf('/%s', $version);
     }
 }
