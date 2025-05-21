@@ -40,26 +40,5 @@ RUN mkdir -p /app/temp && \
     chown -R www-data:www-data /app/temp /app/logs && \
     chmod -R 775 /app/temp /app/logs
 
-ARG API_USERNAME
-ENV API_USERNAME=${API_USERNAME}
-
-ARG API_PASSWORD_HASH
-ENV API_PASSWORD_HASH=${API_PASSWORD_HASH}
-
-ARG S3_BUCKET
-ENV S3_BUCKET=${S3_BUCKET}
-
-ARG S3_REGION
-ENV S3_REGION=${S3_REGION}
-
-ARG S3_ENDPOINT
-ENV S3_ENDPOINT=${S3_ENDPOINT}
-
-ARG S3_ACCESS_KEY
-ENV S3_ACCESS_KEY=${S3_ACCESS_KEY}
-
-ARG S3_SECRET_KEY
-ENV S3_SECRET_KEY=${S3_SECRET_KEY}
-
 RUN chmod +x /app/entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
