@@ -9,6 +9,7 @@ use Nette\Schema\ValidationException;
 use Slim\Exception\HttpInternalServerErrorException;
 use Slim\Exception\HttpUnauthorizedException;
 use Slim\Psr7;
+use Tracy\Debugger;
 
 final class Auth extends Controller
 {
@@ -55,6 +56,7 @@ final class Auth extends Controller
         } catch (ValidationException $e) {
             throw new UnprocessableContentHttpException($request, previous: $e);
         } catch (\Throwable $e) {
+            Debugger::log($e, Debugger::ERROR);
             throw new HttpInternalServerErrorException($request, previous: $e);
         }
     }

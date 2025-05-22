@@ -2,20 +2,24 @@
 
 namespace Api\Endpoints;
 
+use Api\Exceptions\WorkspaceException;
 use Api\Workspace;
-use Nette\Schema\Processor;
 use Api\Schemas\Schema;
+use Nette\Schema\Processor;
 use Nette\Schema\ValidationException;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
 abstract class Controller
 {
+    /**
+     * @throws WorkspaceException
+     */
     protected function getWorkspace(Request $request): Workspace
     {
         $workspace = $request->getAttribute('workspace');
         if (!$workspace) {
-            throw new \RuntimeException('Invalid workspace');
+            throw new WorkspaceException('Request missing "workspace" attribute');
         }
 
         return $workspace;

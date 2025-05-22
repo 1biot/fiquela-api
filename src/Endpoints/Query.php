@@ -3,10 +3,11 @@
 namespace Api\Endpoints;
 
 use Api;
-use Fig\Http\Message\StatusCodeInterface as StatusCodes;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
-use Nette\Utils\Paginator;
+use Nette\Schema\ValidationException;
+use Nette\Utils;
+use Slim\Exception;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 use Tracy\Debugger;
@@ -27,7 +28,7 @@ class Query extends Controller
             [$cachedQuery, $originQueryHash, $originalFileQuery] = $workspace->runQuery($query, $file);
             $count = $cachedQuery->execute()->count();
 
-            $paginator = new Paginator;
+            $paginator = new Utils\Paginator;
             $paginator->setItemCount($count);
             $paginator->setPage((int) ($data['page'] ?? 1));
             $paginator->setItemsPerPage(min(self::DefaultLimit, $count, (int) ($data['limit'] ?? self::DefaultLimit)));
@@ -54,12 +55,14 @@ class Query extends Controller
                     ],
                 ]
             );
+        } catch (ValidationException $e) {
+            throw new Api\Exceptions\UnprocessableContentHttpException($request, previous: $e);
         } catch (FileNotFoundException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], StatusCodes::STATUS_NOT_FOUND);
+            throw new Exception\HttpNotFoundException($request, previous: $e);
         } catch (InvalidFormatException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], StatusCodes::STATUS_BAD_REQUEST);
+            throw new Exception\HttpBadRequestException($request, previous: $e);
         } catch (\Throwable $e) {
-            return $this->json($response, ['error' => $e->getMessage()], StatusCodes::STATUS_INTERNAL_SERVER_ERROR);
+            throw new Exception\HttpInternalServerErrorException($request, previous: $e);
         }
     }
 }

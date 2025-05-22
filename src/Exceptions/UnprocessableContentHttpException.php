@@ -20,13 +20,13 @@ class UnprocessableContentHttpException extends HttpException
     protected string $title = '422 Unprocessable Content';
     protected string $description = 'The request was well-formed but was unable to be followed due to semantic errors.';
 
-    public function getDescription(): string
+    public function getValidationErrors(): array
     {
         $previousException = $this->getPrevious();
         if ($previousException instanceof ValidationException) {
-            return implode(",\n", $previousException->getMessages());
+            return $previousException->getMessages();
         }
 
-        return $this->description;
+        return [];
     }
 }

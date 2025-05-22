@@ -114,7 +114,6 @@ class Workspace
      * @return array{0: Interface\Query, 1: string, 2: Query\FileQuery}
      * @throws InvalidFormatException
      * @throws FileNotFoundException
-     * @throws \Exception
      */
     public function runQuery(string $query, ?string $fileName = null): array
     {
@@ -565,9 +564,6 @@ class Workspace
         return file_exists($this->getQueryCacheFile($query));
     }
 
-    /**
-     * @throws \Exception
-     */
     private function saveQueryResult(Interface\Query $queryObject): void
     {
         if (!is_writable($this->getCachePath())) {
@@ -581,7 +577,7 @@ class Workspace
                 json_encode($result)
             );
         } catch (\Exception $e) {
-            trigger_error($e->getMessage(), E_USER_WARNING);
+            Debugger::log($e, Debugger::ERROR);
         }
     }
 
