@@ -3,6 +3,7 @@
 namespace Api;
 
 use Api\Renderers\ErrorRenderer;
+use Api\Utils\CorsAwareErrorHandler;
 use Api\Utils\TracyPsrLogger;
 use Contributte;
 use Nette;
@@ -16,7 +17,8 @@ class Bootstrap
     public static function initDebugger(): void
     {
         Debugger::$logDirectory = __DIR__ . "/../logs";
-        Debugger::enable(mode: Debugger::Detect, logDirectory: __DIR__ . '/../logs');
+        $isDevEnvironment = Debugger::detectDebugMode(Debugger::Detect);
+        //Debugger::enable(mode: Debugger::Development, logDirectory: __DIR__ . '/../logs');
 
         Debugger::$showBar = false;
         Debugger::$strictMode = Debugger::$productionMode === Debugger::Development
@@ -58,9 +60,22 @@ class Bootstrap
                 $authGroup->post('/revoke', [Endpoints\Auth::class, 'revoke']);
             })->add(Middlewares\ApiVersionHeaderMiddleware::class);
 
+            $apiGroup->get(
+                '/ping',
+                function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
+                    $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
+                    $response->getBody()->write('pong');
+                    return $response;
+                }
+            );
+
+            $apiGroup->get('/status', Endpoints\Status::class)
+                ->add(Middlewares\ApiVersionHeaderMiddleware::class)
+                ->add(Middlewares\AuthMiddleware::class);
+
             $version = self::getVersion();
             $apiGroup->group(
-                self::getVersionEndpoint($version),
+                self::getVersionEndpoint($version), // @return /v1
                 function(RouteCollectorProxyInterface $versionGroup) use ($version) {
                     $versionGroup->get('/files', [Endpoints\Files::class, 'list']);
                     $versionGroup->post('/files', [Endpoints\Files::class, 'insert']);
@@ -73,15 +88,6 @@ class Bootstrap
                     $versionGroup->get('/export/{hash}', Endpoints\Export::class);
 
                     $versionGroup->get('/history[/{date:\d{4}-\d{2}-\d{2}}]', Endpoints\History::class);
-
-                    $versionGroup->get(
-                        '/ping',
-                        function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
-                            $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
-                            $response->getBody()->write('pong');
-                            return $response;
-                        }
-                    );
                 }
             )->add(Middlewares\ApiVersionHeaderMiddleware::class)
                 ->add(Middlewares\AuthMiddleware::class);
@@ -90,13 +96,16 @@ class Bootstrap
 
     public static function addErrorMiddleware(Slim\App $app): void
     {
+        $isDevEnvironment = Debugger::detectDebugMode(Debugger::Development);
         $errorMiddleware = $app->addErrorMiddleware(
-            Debugger::$productionMode === Debugger::Development,
-            Debugger::$productionMode === Debugger::Production,
-            Debugger::$productionMode === Debugger::Production,
+            $isDevEnvironment,
+            !$isDevEnvironment,
+            !$isDevEnvironment,
             new TracyPsrLogger(Debugger::getLogger())
         );
 
+        $corsAwareErrorHandler = new CorsAwareErrorHandler($app->getCallableResolver(), $app->getResponseFactory());
+        $errorMiddleware->setDefaultErrorHandler($corsAwareErrorHandler);
         $errorHandler = $errorMiddleware->getDefaultErrorHandler();
         $errorHandler->registerErrorRenderer('application/json', ErrorRenderer::class);
         $errorHandler->forceContentType('application/json');

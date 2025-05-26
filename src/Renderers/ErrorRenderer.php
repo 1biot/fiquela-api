@@ -30,7 +30,7 @@ class ErrorRenderer implements ErrorRendererInterface
         if ($exception instanceof UnprocessableContentHttpException) {
             $response['details'] = $exception->getValidationErrors();
         } elseif ($showDetails) {
-            $response['details'] = $exception->getTrace();
+            $response['details'] = $exception->getPrevious()?->getMessage();
         }
 
         return json_encode($response, JSON_PRETTY_PRINT);

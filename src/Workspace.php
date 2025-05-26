@@ -85,6 +85,11 @@ class Workspace
         return $this->uuid;
     }
 
+    public function hasS3Sync(): bool
+    {
+        return $this->s3Sync !== null;
+    }
+
     public function getCachePath(): string
     {
         return $this->getRootPath() . DIRECTORY_SEPARATOR . self::CachePath;
