@@ -7,11 +7,16 @@ use Api\Workspace;
 use Api\Schemas\Schema;
 use Nette\Schema\Processor;
 use Nette\Schema\ValidationException;
+use Psr\Log\LoggerInterface;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
 
 abstract class Controller
 {
+    public function __construct(protected LoggerInterface $logger)
+    {
+    }
+
     /**
      * @throws WorkspaceException
      */

@@ -5,7 +5,6 @@ namespace Api\Endpoints;
 use Api;
 use FQL;
 use Slim\Psr7;
-use Tracy\Debugger;
 
 /**
  * @phpstan-import-type Schema from Api\Workspace
@@ -18,7 +17,7 @@ class Files extends Controller
             $workspace = $this->getWorkspace($request);
             return $this->json($response, $workspace->getFilesSchemas());
         } catch (\RuntimeException $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error listing files', ['exception' => $e]);
             return $this->json($response, ['error' => 'Could not list a files'], 500);
         }
     }
@@ -35,7 +34,7 @@ class Files extends Controller
 
             throw new \RuntimeException('Unsupported content type: ' . $insertType);
         } catch (\RuntimeException $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error inserting file', ['exception' => $e]);
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }
     }
@@ -129,7 +128,7 @@ class Files extends Controller
                 ]
             );
         } catch (\Throwable $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error uploading file', ['exception' => $e]);
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }
     }
@@ -145,7 +144,7 @@ class Files extends Controller
         }
 
         if ($uploadedFile->getError() !== UPLOAD_ERR_OK) {
-            throw new \RuntimeException('File upload error');
+            throw new \RuntimeException(sprintf('File upload error (%s)', $uploadedFile->getError()));
         }
 
         return $uploadedFile;
@@ -158,7 +157,7 @@ class Files extends Controller
             $schema = $workspace->download($this->validateRequest($request, new Api\Schemas\DownloadFile));
             return $this->json($response, ['schema' => $schema]);
         } catch (\Throwable $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error downloading file', ['exception' => $e]);
             return $this->json($response, ['error' => 'Could not download a file'], 500);
         }
     }

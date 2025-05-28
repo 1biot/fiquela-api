@@ -13,9 +13,10 @@ use FQL\Results\Stream as StreamResults;
 use FQL\Query;
 use FQL\Sql;
 use FQL\Stream;
+use FQL\Traits\Helpers\EnhancedNestedArrayAccessor;
+use Psr\Log\LoggerInterface;
 use Slim\Psr7\UploadedFile;
 use Symfony\Component\Uid\Uuid;
-use Tracy\Debugger;
 
 /**
  * @phpstan-type HistoryRow array{
@@ -48,22 +49,31 @@ use Tracy\Debugger;
 */
 class Workspace
 {
+    use EnhancedNestedArrayAccessor;
+
     private const string CachePath = 'cache';
     private const string FilesPath = 'files';
     private const string HistoryPath = 'history';
     private const string SchemasPath = 'schemas';
 
     private readonly string $rootPath;
+    private readonly bool $readonly;
     private readonly ?S3Sync $s3Sync;
     private ?string $uuid = null;
 
-    public function __construct(string $rootPath, ?S3Sync $s3Sync = null)
+    public function __construct(array $config, ?S3Sync $s3Sync = null, private readonly LoggerInterface $logger)
     {
+        $rootPath = $config['rootPath'] ?? null;
+        if (!is_string($rootPath) || $rootPath === '') {
+            throw new \RuntimeException('Root path must be a non-empty string');
+        }
+
         if (is_writable($rootPath) === false) {
             throw new \RuntimeException('Root path is not writable');
         }
 
         $this->rootPath = rtrim($rootPath, DIRECTORY_SEPARATOR);
+        $this->readonly = $config['readonly'] ?? false;
         $this->s3Sync = $s3Sync;
 
         $this->initializeWorkspaceUuid();
@@ -120,7 +130,7 @@ class Workspace
      * @throws InvalidFormatException
      * @throws FileNotFoundException
      */
-    public function runQuery(string $query, ?string $fileName = null): array
+    public function runQuery(string $query, ?string $fileName = null, bool $refresh = false): array
     {
         if ($fileName !== null) {
             $schema = $this->getSchemaByFileName($fileName);
@@ -137,7 +147,7 @@ class Workspace
             ? $sqlQuery->parseWithQuery($queryObject)
             : $sqlQuery->toQuery();
 
-        if (is_writable($this->getCachePath())) {
+        if (!$refresh && is_writable($this->getCachePath())) {
             if (!$this->queryResultExists($queryObject)) {
                 $this->saveQueryResult($queryObject);
             }
@@ -188,6 +198,10 @@ class Workspace
 
     public function addFileFromUploadedFile(UploadedFile $uploadedFile): array
     {
+        if ($this->isReadonly()) {
+            throw new \RuntimeException('Workspace is read-only');
+        }
+
         $format = $this->getFileTypeFromUploadedFile($uploadedFile, function (string $extension) {
             $extensionEnum = \FQL\Enum\Format::fromExtension($extension);
             return $extensionEnum->value;
@@ -251,7 +265,9 @@ class Workspace
         $fileName = $this->getSchemasPath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $schema['name']);
         $this->extendsSchema($schema);
         file_put_contents($fileName, json_encode($schema, JSON_OBJECT_AS_ARRAY));
-        $this->s3Sync?->uploadSchema($schema, $this->getSchemasPath());
+        if ($this->isWritable()) {
+            $this->s3Sync?->uploadSchema($schema, $this->getSchemasPath());
+        }
     }
 
     /**
@@ -272,34 +288,30 @@ class Workspace
             $counter = 0;
             $arrayKeys = [];
             $colEnumCheck = [];
+            $uniqueTrackers = [];
 
             foreach ($queryObject->selectAll()->execute(StreamResults::class)->getIterator() as $item) {
                 $counter++;
 
+                // Flatten input row to support nested structures
+                $flattenedItem = $this->flattenItem($item);
+
+                // Track missing fields across rows
                 foreach (array_keys($arrayKeys) as $knownKey) {
-                    if (!array_key_exists($knownKey, $item)) {
-                        if (!isset($arrayKeys[$knownKey]['null'])) {
-                            $arrayKeys[$knownKey]['null'] = 0;
-                        }
-                        $arrayKeys[$knownKey]['null']++;
+                    if (!array_key_exists($knownKey, $flattenedItem)) {
+                        $arrayKeys[$knownKey]['null'] = ($arrayKeys[$knownKey]['null'] ?? 0) + 1;
                     }
                 }
 
-                foreach (array_keys($item) as $key) {
-                    $value = $item[$key];
+                foreach ($flattenedItem as $key => $value) {
                     $type = Type::match($value);
-
-                    if ($type === Type::ARRAY && isset($value['@attributes']) && array_key_exists('value', $value)) {
-                        $type = Type::match($value['value']);
-                        $key = $key . '.value';
-                        $value = $value['value'];
-                    }
 
                     if (!isset($arrayKeys[$key])) {
                         $arrayKeys[$key] = [];
                     }
 
                     $typeName = $value === null ? 'null' : $type->value;
+
                     if (is_string($value)) {
                         $trimmed = trim($value);
                         if ($value === '') {
@@ -313,38 +325,42 @@ class Workspace
                         }
                     }
 
-                    if (!isset($arrayKeys[$key][$typeName])) {
-                        $arrayKeys[$key][$typeName] = 0;
-                    }
+                    $arrayKeys[$key][$typeName] = ($arrayKeys[$key][$typeName] ?? 0) + 1;
 
-                    $arrayKeys[$key][$typeName]++;
-
-                    // Enum sample – only for scalar non-empty values
+                    // Enum detection
                     if (!isset($colEnumCheck[$key])) {
                         $colEnumCheck[$key] = [];
                     }
 
                     if (is_array($colEnumCheck[$key]) && is_scalar($value)) {
                         $stringValue = (string)$value;
-
-                        // ignore null, '' or whitespace
                         if ($stringValue !== '' && trim($stringValue) !== '') {
                             $colEnumCheck[$key][$stringValue] = ($colEnumCheck[$key][$stringValue] ?? 0) + 1;
-
-                            // as soon as it exceeds 5 uniques – discard
                             if (count($colEnumCheck[$key]) > 5) {
                                 unset($colEnumCheck[$key]);
                             }
                         }
                     } elseif (is_array($colEnumCheck[$key])) {
-                        // noscalar -> discard
                         unset($colEnumCheck[$key]);
                     }
 
+                    // Unique value tracking
+                    if (!isset($uniqueTrackers[$key])) {
+                        $uniqueTrackers[$key] = [];
+                    }
+
+                    if (is_scalar($value) && !in_array($typeName, ['null', 'empty-string', 'whitespace'], true) && isset($uniqueTrackers[$key])) {
+                        $stringValue = (string)$value;
+                        if (isset($uniqueTrackers[$key][$stringValue])) {
+                            unset($uniqueTrackers[$key]); // not unique
+                        } else {
+                            $uniqueTrackers[$key][$stringValue] = true;
+                        }
+                    }
                 }
             }
 
-            $schema['columns'] = array_map(function ($key) use ($arrayKeys, $colEnumCheck, $counter) {
+            $schema['columns'] = array_map(function ($key) use ($arrayKeys, $colEnumCheck, $counter, $uniqueTrackers) {
                 $emptyTypes = ['null', 'empty-string', 'whitespace'];
                 $types = $arrayKeys[$key];
                 $typeEntries = $types;
@@ -384,15 +400,21 @@ class Workspace
                     $uniqueCount = count($enumSet);
                     $occurrenceCount = array_sum($enumSet);
 
-                    // constant = 1 value, which occurs in all rows where there was a non-empty value
                     if ($uniqueCount === 1 && $occurrenceCount === $filledCount) {
                         $isConstant = true;
-                    }
-
-                    // enum = 2-5 various values that COVER THE ENTIRE column (all rows where there is no null)
-                    elseif ($uniqueCount >= 2 && $uniqueCount <= 5 && $occurrenceCount === $filledCount && $completeness > 0.1) {
+                    } elseif ($uniqueCount >= 2 && $uniqueCount <= 5 && $occurrenceCount === $filledCount && $completeness > 0.1) {
                         $isEnum = true;
                     }
+                }
+
+                $isUnique = false;
+                if (
+                    isset($uniqueTrackers[$key])
+                    && count($uniqueTrackers[$key]) > 0 // must contain some actual value
+                    && $filledCount > 0 // column must be filled at least once
+                    && count($uniqueTrackers[$key]) === $filledCount
+                ) {
+                    $isUnique = true;
                 }
 
                 return [
@@ -406,18 +428,42 @@ class Workspace
                     'completeness' => round($completeness, 4),
                     'constant' => $isConstant,
                     'isEnum' => $isEnum,
+                    'isUnique' => $isUnique,
                 ];
             }, array_keys($arrayKeys));
 
             $schema['count'] = $counter;
             return true;
-
         } catch (\Exception $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error while extending schema', ['exception' => $e]);
             $schema['columns'] = [];
             $schema['count'] = 0;
             return false;
         }
+    }
+
+    /**
+     * Recursively flattens nested associative arrays into dot notation keys (up to 3 levels deep)
+     */
+    private function flattenItem(array $item, string $prefix = '', int $level = 0): array
+    {
+        if ($level >= 3) {
+            return [];
+        }
+
+        $flat = [];
+
+        foreach ($item as $key => $value) {
+            $path = $prefix !== '' ? "{$prefix}.{$key}" : $key;
+
+            if (is_array($value) && $this->isAssoc($value)) {
+                $flat += $this->flattenItem($value, $path, $level + 1);
+            } else {
+                $flat[$path] = $value;
+            }
+        }
+
+        return $flat;
     }
 
     public function logQuery(string $query, ?Interface\Query $queryObject = null): void
@@ -486,6 +532,10 @@ class Workspace
      */
     public function removeFileByGuid(string $uuid): void
     {
+        if ($this->isReadonly()) {
+            throw new \RuntimeException('Workspace is read-only');
+        }
+
         $schema = $this->getSchema($uuid);
         if ($schema === null) {
             throw new FileNotFoundException('Schema of file not found');
@@ -582,7 +632,7 @@ class Workspace
                 json_encode($result)
             );
         } catch (\Exception $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error while saving query result', ['exception' => $e]);
         }
     }
 
@@ -654,6 +704,10 @@ class Workspace
      */
     public function download(array $data): array
     {
+        if ($this->isReadonly()) {
+            throw new \RuntimeException('Workspace is read-only');
+        }
+
         $downloader = new Downloader();
         $downloadedFile = $downloader->downloadToFile(
             $data['url'],
@@ -700,6 +754,16 @@ class Workspace
         return md5(realpath($this->getRootPath()));
     }
 
+    public function isReadonly(): bool
+    {
+        return $this->readonly;
+    }
+
+    public function isWritable(): bool
+    {
+        return !$this->isReadonly();
+    }
+
     private function shouldSync(string $markerPath, array $current): bool
     {
         $saved = json_decode(@file_get_contents($markerPath), true);
@@ -721,7 +785,11 @@ class Workspace
         }
 
         $markerFile = $this->getSyncMarkerPath();
-        if (!file_exists($markerFile)) {
+        if (file_exists($markerFile)) {
+            return;
+        }
+
+        if ($this->isWritable()) {
             foreach ($this->getFilesSchemas() as $schema) {
                 $filePath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
                 if (!file_exists($filePath)) {
@@ -733,9 +801,9 @@ class Workspace
                     $this->saveSchema($schema);
                 }
             }
-
-            $this->writeSyncMarker();
         }
+
+        $this->writeSyncMarker();
     }
 
     private function initializeWorkspaceUuid(): void

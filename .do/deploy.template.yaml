@@ -12,6 +12,9 @@ spec:
       instance_count: 1
       instance_size_slug: basic-xxs
       envs:
+        - key: API_ENV
+          scope: RUN_TIME
+          value: "prod"
         - key: API_USER
           scope: RUN_TIME
           type: SECRET

@@ -4,33 +4,22 @@ namespace Api;
 
 use Api\Renderers\ErrorRenderer;
 use Api\Utils\CorsAwareErrorHandler;
-use Api\Utils\TracyPsrLogger;
 use Contributte;
 use Nette;
 use Psr\Container;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
+use Psr\Log\LoggerInterface;
 use Slim;
 use Slim\Interfaces\RouteCollectorProxyInterface;
-use Tracy\Debugger;
 
 class Bootstrap
 {
-    public static function initDebugger(): void
-    {
-        Debugger::$logDirectory = __DIR__ . "/../logs";
-        $isDevEnvironment = Debugger::detectDebugMode(Debugger::Detect);
-        //Debugger::enable(mode: Debugger::Development, logDirectory: __DIR__ . '/../logs');
-
-        Debugger::$showBar = false;
-        Debugger::$strictMode = Debugger::$productionMode === Debugger::Development
-            ? true
-            : (E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
-        Debugger::$scream = Debugger::$productionMode === Debugger::Development;
-    }
-
     public static function createContainer(): Container\ContainerInterface
     {
         $loader = new Nette\DI\ContainerLoader(__DIR__ . '/../temp', true);
         self::loadEnvironmentVariables();
+        self::setupErrorReporting();
         $class = $loader->load(function(Nette\DI\Compiler $compiler) {
             $compiler->loadConfig(__DIR__ . '/../config/app/config.neon');
         });
@@ -55,11 +44,6 @@ class Bootstrap
         });
 
         $app->group('/api', function (RouteCollectorProxyInterface $apiGroup) {
-            $apiGroup->group('/auth', function (RouteCollectorProxyInterface $authGroup) {
-                $authGroup->post('/login', [Endpoints\Auth::class, 'login']);
-                $authGroup->post('/revoke', [Endpoints\Auth::class, 'revoke']);
-            })->add(Middlewares\ApiVersionHeaderMiddleware::class);
-
             $apiGroup->get(
                 '/ping',
                 function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
@@ -68,6 +52,11 @@ class Bootstrap
                     return $response;
                 }
             );
+
+            $apiGroup->group('/auth', function (RouteCollectorProxyInterface $authGroup) {
+                $authGroup->post('/login', [Endpoints\Auth::class, 'login']);
+                $authGroup->post('/revoke', [Endpoints\Auth::class, 'revoke']);
+            })->add(Middlewares\ApiVersionHeaderMiddleware::class);
 
             $apiGroup->get('/status', Endpoints\Status::class)
                 ->add(Middlewares\ApiVersionHeaderMiddleware::class)
@@ -94,17 +83,25 @@ class Bootstrap
         });
     }
 
+    /**
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
     public static function addErrorMiddleware(Slim\App $app): void
     {
-        $isDevEnvironment = Debugger::detectDebugMode(Debugger::Development);
+        $isDevEnvironment = !self::isProduction();
         $errorMiddleware = $app->addErrorMiddleware(
             $isDevEnvironment,
-            !$isDevEnvironment,
-            !$isDevEnvironment,
-            new TracyPsrLogger(Debugger::getLogger())
+            true,
+            true,
+            $app->getContainer()->get(LoggerInterface::class)
         );
 
-        $corsAwareErrorHandler = new CorsAwareErrorHandler($app->getCallableResolver(), $app->getResponseFactory());
+        $corsAwareErrorHandler = new CorsAwareErrorHandler(
+            $app->getCallableResolver(),
+            $app->getResponseFactory(),
+            $app->getContainer()->get(LoggerInterface::class)
+        );
         $errorMiddleware->setDefaultErrorHandler($corsAwareErrorHandler);
         $errorHandler = $errorMiddleware->getDefaultErrorHandler();
         $errorHandler->registerErrorRenderer('application/json', ErrorRenderer::class);
@@ -116,8 +113,25 @@ class Bootstrap
         return 'v1';
     }
 
+    public static function isProduction(): bool {
+        return ($_ENV['API_ENV'] ?? '') === 'prod';
+    }
+
     private static function getVersionEndpoint(string $version): string
     {
         return sprintf('/%s', $version);
+    }
+
+    private static function setupErrorReporting(): void
+    {
+        if (self::isProduction()) {
+            error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+            ini_set('display_errors', '0');
+        } else {
+            error_reporting(E_ALL);
+            ini_set('display_errors', '1');
+        }
+
+        ini_set('log_errors', '1');
     }
 }

@@ -120,6 +120,18 @@ components:
                 nullable: true
               suspicious:
                 type: "boolean"
+              confidence:
+                type: "number"
+                format: "float"
+              completeness:
+                type: "number"
+                format: "float"
+              constant:
+                type: "boolean"
+              isEnum:
+                type: "boolean"
+              isUnique:
+                type: "boolean"
             required:
               - "column"
               - "types"
@@ -127,6 +139,11 @@ components:
               - "totalTypes"
               - "dominant"
               - "suspicious"
+              - "confidence"
+              - "completeness"
+              - "constant"
+              - "isEnum"
+              - "isUnique"
             additionalProperties: false
       additionalProperties: false
     FilesSchema:
@@ -160,6 +177,10 @@ components:
         page:
           type: integer
           nullable: true
+        refresh:
+          type: boolean
+          nullable: true
+          default: false
       required:
         - query
     QueryResultSchema:
@@ -320,6 +341,15 @@ paths:
                       types:
                         string: 23
                         empty-string: 12
+                      totalRows: 35
+                      totalTypes: 2
+                      dominant: "string"
+                      suspicious: false
+                      confidence: 0.95
+                      completeness: 0.98
+                      constant: false
+                      isEnum: false
+                      isUnique: true
                     - column: "images"
                       types:
                         array: 234
@@ -327,7 +357,15 @@ paths:
                       types:
                         int: 98
                         double: 12
-
+                      totalRows: 110
+                      totalTypes: 2
+                      dominant: "int"
+                      suspicious: false
+                      confidence: 0.95
+                      completeness: 0.98
+                      constant: false
+                      isEnum: false
+                      isUnique: false
       summary: Upload file from remote URL or local file
   /api/v1/files/{uuid}:
     get:

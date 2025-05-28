@@ -6,15 +6,16 @@ use Api\Auth\AuthenticatorFactory;
 use Api\Auth\SingleUserJwtAuthenticator;
 use Api\Exceptions\UnprocessableContentHttpException;
 use Nette\Schema\ValidationException;
+use Psr\Log\LoggerInterface;
 use Slim\Exception\HttpInternalServerErrorException;
 use Slim\Exception\HttpUnauthorizedException;
 use Slim\Psr7;
-use Tracy\Debugger;
 
 final class Auth extends Controller
 {
-    public function __construct(private readonly AuthenticatorFactory $authenticatorFactory)
+    public function __construct(LoggerInterface $logger, private readonly AuthenticatorFactory $authenticatorFactory)
     {
+        parent::__construct($logger);
     }
 
     public function login(Psr7\Request $request, Psr7\Response $response): Psr7\Response
@@ -56,7 +57,7 @@ final class Auth extends Controller
         } catch (ValidationException $e) {
             throw new UnprocessableContentHttpException($request, previous: $e);
         } catch (\Throwable $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('Error revoking token', ['exception' => $e]);
             throw new HttpInternalServerErrorException($request, previous: $e);
         }
     }

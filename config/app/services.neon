@@ -1,17 +1,39 @@
 services:
+    logFormatter: \Monolog\Formatter\JsonFormatter
+
+    rotatingFileHandler:
+        class: \Monolog\Handler\RotatingFileHandler
+        arguments:
+            - %logDir%/api.log
+            - 7
+            - \Monolog\Logger::DEBUG
+        setup:
+            - setFormatter(@logFormatter)
+
+    logger:
+        class: \Monolog\Logger
+        arguments:
+            - "api"
+        setup:
+            - pushHandler(@rotatingFileHandler)
+
     S3SyncFactory: \Api\Storage\S3SyncFactory(%workspaceS3%)
-    workspace: \Api\Workspace(%workspacePath%, @S3SyncFactory::create())
+
+    workspace: \Api\Workspace(%workspace%, @S3SyncFactory::create())
+
     jwtAuthenticator: \Api\Auth\SingleUserJwtAuthenticator(%apiUsername%, %apiPasswordHash%, @workspace)
+
     authenticatorFactory:
-        class: \Api\Auth\AuthenticatorFactory()
+        class: \Api\Auth\AuthenticatorFactory
         setup:
             - register(@jwtAuthenticator, true)
 
     - \Api\Middlewares\AuthMiddleware(@authenticatorFactory)
 
-    - \Api\Endpoints\Auth(@authenticatorFactory)
+    - \Api\Endpoints\Auth(@logger, @authenticatorFactory)
     - \Api\Endpoints\Export
     - \Api\Endpoints\Files
     - \Api\Endpoints\History
     - \Api\Endpoints\Query
+    - \Api\Endpoints\Status
 

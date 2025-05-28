@@ -6,7 +6,6 @@ use Api;
 use Firebase\JWT;
 use Psr;
 use Random\RandomException;
-use Tracy\Debugger;
 
 readonly class SingleUserJwtAuthenticator implements AuthenticatorInterface
 {
@@ -15,7 +14,8 @@ readonly class SingleUserJwtAuthenticator implements AuthenticatorInterface
     public function __construct(
         private string $username,
         private string $passwordHash,
-        private Api\Workspace $workspace
+        private Api\Workspace $workspace,
+        private readonly Psr\Log\LoggerInterface $logger
     ) {
         $this->secretFile = __DIR__ . '/../../temp/jwt_secret.json';
     }
@@ -46,7 +46,7 @@ readonly class SingleUserJwtAuthenticator implements AuthenticatorInterface
 
             return $this->workspace;
         } catch (\Throwable $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('JWT decode error', ['exception' => $e]);
             return null;
         }
     }
@@ -61,7 +61,7 @@ readonly class SingleUserJwtAuthenticator implements AuthenticatorInterface
         try {
             return JWT\JWT::encode($this->createJwtPayload($username), $this->getSecret(), 'HS256');
         } catch (\Throwable $e) {
-            Debugger::log($e, Debugger::ERROR);
+            $this->logger->error('JWT encode error', ['exception' => $e]);
             return null;
         }
     }

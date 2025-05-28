@@ -3,6 +3,7 @@
 namespace Api\Endpoints;
 
 use Api;
+use Api\Utils\Stopwatch;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
 use Nette\Schema\ValidationException;
@@ -10,7 +11,6 @@ use Nette\Utils;
 use Slim\Exception;
 use Slim\Psr7\Request;
 use Slim\Psr7\Response;
-use Tracy\Debugger;
 
 class Query extends Controller
 {
@@ -18,14 +18,15 @@ class Query extends Controller
 
     public function __invoke(Request $request, Response $response, array $args): Response
     {
-        Debugger::timer('query');
+        Stopwatch::start('query');
         try {
             $workspace = $this->getWorkspace($request);
             $data = $this->validateRequest($request, new Api\Schemas\Query);
             $file = $data['file'] ?? null;
+            $refresh = $data['refresh'] ?? false;
             $query = $data['query'] ?? '';
 
-            [$cachedQuery, $originQueryHash, $originalFileQuery] = $workspace->runQuery($query, $file);
+            [$cachedQuery, $originQueryHash, $originalFileQuery] = $workspace->runQuery($query, $file, $refresh);
             $count = $cachedQuery->execute()->count();
 
             $paginator = new Utils\Paginator;
@@ -45,7 +46,7 @@ class Query extends Controller
                     'file' => $file,
                     'hash' => $originQueryHash,
                     'data' => iterator_to_array($cachedQuery->execute()->getIterator()),
-                    'elapsed' => round(Debugger::timer('query') * 1000, 2), // in milliseconds
+                    'elapsed' => round(Stopwatch::stop('query') * 1000, 2), // in milliseconds
                     'pagination' => [
                         'page' => $paginator->getPage(),
                         'pageCount' => $paginator->getPageCount(),

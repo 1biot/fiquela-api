@@ -20,6 +20,7 @@ class Status extends Controller
                 'fiquela_version' => \Composer\InstalledVersions::getPrettyVersion('1biot/fiquela'),
                 'workspace' => [
                     'id' => $workspace->getId(),
+                    'readonly' => $workspace->isReadonly(),
                     's3' => $workspace->hasS3Sync(),
                 ]
             ]

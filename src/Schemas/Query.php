@@ -13,6 +13,7 @@ class Query implements Schema
     {
         return Expect::array([
             'query' => Expect::string()->required(),
+            'refresh' => Expect::bool()->nullable(),
             'file' => Expect::string()->nullable(),
             'limit' => Expect::int()->min(1)->max(Api\Endpoints\Query::DefaultLimit)->nullable(),
             'page' => Expect::int()->min(1)->nullable(),
