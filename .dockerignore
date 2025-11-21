@@ -2,6 +2,7 @@
 config/nginx
 http
 logs
+node_modules
 workspace
 vendor
 temp

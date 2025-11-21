@@ -729,7 +729,6 @@ class Workspace
 
     private function normalizeQuery(string $queryString): string
     {
-        $queryString = preg_replace('/\s+/', ' ', $queryString);
         return trim($queryString);
     }
 
@@ -762,12 +761,6 @@ class Workspace
     public function isWritable(): bool
     {
         return !$this->isReadonly();
-    }
-
-    private function shouldSync(string $markerPath, array $current): bool
-    {
-        $saved = json_decode(@file_get_contents($markerPath), true);
-        return !$saved || $saved['workspace'] !== $current['workspace'] || $saved['s3'] !== $current['s3'];
     }
 
     private function initializeDirectories(): void

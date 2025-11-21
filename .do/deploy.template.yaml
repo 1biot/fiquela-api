@@ -14,7 +14,7 @@ spec:
       envs:
         - key: API_ENV
           scope: RUN_TIME
-          value: "prod"
+          value: "production"
         - key: API_USER
           scope: RUN_TIME
           type: SECRET
@@ -23,7 +23,6 @@ spec:
           type: SECRET
         - key: S3_ENABLED
           scope: RUN_TIME
-          type: SECRET
           value: "0"
         - key: S3_BUCKET
           scope: RUN_TIME
