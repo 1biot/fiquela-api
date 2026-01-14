@@ -19,7 +19,7 @@ services:
 
     S3SyncFactory: \Api\Storage\S3SyncFactory(%workspaceS3%)
 
-    workspace: \Api\Workspace(%workspace%, @S3SyncFactory::create())
+    workspace: \Api\Workspace(@logger, %workspace%, @S3SyncFactory::create())
 
     jwtAuthenticator: \Api\Auth\SingleUserJwtAuthenticator(%apiUsername%, %apiPasswordHash%, @workspace)
 

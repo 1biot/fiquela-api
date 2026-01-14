@@ -61,7 +61,7 @@ class Workspace
     private readonly ?S3Sync $s3Sync;
     private ?string $uuid = null;
 
-    public function __construct(array $config, ?S3Sync $s3Sync = null, private readonly LoggerInterface $logger)
+    public function __construct(private readonly LoggerInterface $logger, array $config, ?S3Sync $s3Sync = null)
     {
         $rootPath = $config['rootPath'] ?? null;
         if (!is_string($rootPath) || $rootPath === '') {
