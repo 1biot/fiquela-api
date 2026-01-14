@@ -8,7 +8,13 @@ RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     oniguruma-dev \
-    && docker-php-ext-install intl zip pdo pdo_mysql opcache mbstring
+    reetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    && docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+    && docker-php-ext-install intl zip pdo pdo_mysql opcache mbstring gd
 
 COPY config/docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 
