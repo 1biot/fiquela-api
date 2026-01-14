@@ -8,7 +8,7 @@ RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     oniguruma-dev \
-    reetype-dev \
+    freetype-dev \
     libjpeg-turbo-dev \
     libpng-dev \
     && docker-php-ext-configure gd \
