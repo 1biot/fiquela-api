@@ -135,7 +135,7 @@ cd fiquela-api
 ### 2. Configure your environment variables
 
 ```bash
-touch .env
+cp .env_default .env
 ```
 
 #### 🔐 Credentials
@@ -156,9 +156,12 @@ $2y$10$cSjiZDZ.qoHBmNbXeBMJvutUtDQHqryy1e3.NrIjhE7ZXR4FoFwT6
 Final `.env` file should look like this:
 
 ```bash
+API_ENV="dev"
 API_USER="your-username"
-API_PASSWORD_HASH="$2y$10$cSjiZDZ..."
+API_PASSWORD_HASH="$$2y$$10$$cSjiZDZ..."
 ```
+
+> Do not forget to escape the `$` character with another `$` in the `API_PASSWORD_HASH` value.
 
 #### 💾 S3 backup configuration
 

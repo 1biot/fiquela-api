@@ -98,7 +98,7 @@ class Export extends Controller
         ?string $delimiter
     ): Psr7\Response {
         $stream = fopen('php://temp', 'r+');
-        $csv = Csv\Writer::createFromStream($stream);
+        $csv = Csv\Writer::from($stream);
         $csv->setDelimiter($delimiter ?? ($format === 'csv' ? ',' : "\t"));
 
         $hasWrittenHeader = false;
