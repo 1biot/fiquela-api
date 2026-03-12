@@ -147,16 +147,19 @@ class Workspace
             ? $sqlQuery->parseWithQuery($queryObject)
             : $sqlQuery->toQuery();
 
-        if (!$refresh && is_writable($this->getCachePath())) {
-            if (!$this->queryResultExists($queryObject)) {
-                $this->saveQueryResult($queryObject);
-            }
+        $cacheFile = $this->getQueryCacheFile($queryObject);
+        if ($refresh && file_exists($cacheFile)) {
+            unlink($cacheFile); // invalidate
+        }
+
+        if (!$this->queryResultExists($queryObject) && is_writable($this->getCachePath())) {
+            $this->saveQueryResult($queryObject);
         }
 
         $originalQuery = $queryObject;
         $originalFileQuery = $originalQuery->provideFileQuery();
         if ($this->queryResultExists($queryObject)) {
-            $queryObject = Stream\JsonStream::open($this->getQueryCacheFile($queryObject))->query();
+            $queryObject = Stream\JsonStream::open($cacheFile)->query();
         }
 
         $this->logQuery($query, $originalQuery);

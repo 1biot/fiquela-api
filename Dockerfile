@@ -32,7 +32,7 @@ COPY . /app
 RUN composer install --no-dev --optimize-autoloader
 
 # FINAL IMAGE
-FROM base as final
+FROM base AS final
 
 COPY --from=builder /app /app
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer
