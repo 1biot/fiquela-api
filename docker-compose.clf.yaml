@@ -1,7 +1,19 @@
 services:
   app:
+    build:
+      context: .
+    container_name: fiquela-api
+    expose:
+      - "9000"
     volumes:
       - fiquela-workspace:/app/workspace
 
+  web:
+    image: nginx:alpine
+    container_name: fiquela-web
+    volumes:
+      - ./config/docker/nginx:/etc/nginx/conf.d
+    depends_on:
+      - app
 volumes:
   fiquela-workspace:
