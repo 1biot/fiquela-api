@@ -6,7 +6,7 @@
     "1biot/fiquela": "^2.0",
     "aws/aws-sdk-php": "^3.0",
     "contributte/psr11-container-interface": "^0.6.0",
-    "firebase/php-jwt": "^6.11",
+    "firebase/php-jwt": "^7",
     "guzzlehttp/guzzle": "^7.9",
     "league/flysystem-aws-s3-v3": "^3.0",
     "monolog/monolog": "^3.9",
