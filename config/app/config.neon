@@ -2,7 +2,6 @@ parameters:
     rootDir: ./..
     logDir: %rootDir%/logs
     wwwDir: %rootDir%/public
-    apiKey: ::getenv(API_TOKEN)
     apiUsername: ::getenv(API_USER)
     apiPasswordHash: ::getenv(API_PASSWORD_HASH)
     workspace:

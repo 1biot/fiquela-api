@@ -23,6 +23,15 @@ WORKDIR /app
 # COMPOSER FROM OFFICIAL IMAGE
 FROM composer:latest AS composer
 
+# DEV IMAGE (expects app files via volume mount)
+FROM base AS dev
+
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+RUN echo "opcache.validate_timestamps=1" >> /usr/local/etc/php/conf.d/custom.ini
+
+WORKDIR /app
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
+
 # BUILDER
 FROM base AS builder
 

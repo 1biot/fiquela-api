@@ -199,13 +199,13 @@ cd ./public && php -S localhost:6917
 #### Localhost
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.dev.yaml build
+docker compose -f docker-compose.dev.yaml build
 ```
 
 #### Coolify
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.clf.yaml build
+docker compose -f docker-compose.clf.yaml build
 ```
 
 ### 5. Launch the API server
@@ -213,16 +213,22 @@ docker compose -f docker-compose.yaml -f docker-compose.clf.yaml build
 #### Localhost
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d
+docker compose -f docker-compose.dev.yaml up -d
 ```
 
 #### Coolify
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.clf.yaml up -d
+docker compose -f docker-compose.clf.yaml up -d
 ```
 
-### 6. Digital Ocean
+### 6. Deploy
+
+#### Heroku
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/1biot/fiquela-api)
+
+#### Digital Ocean
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/1biot/fiquela-api/tree/main?refcode=92025543cb9f)
 
