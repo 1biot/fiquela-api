@@ -224,10 +224,6 @@ docker compose -f docker-compose.clf.yaml up -d
 
 ### 6. Deploy
 
-#### Heroku
-
-[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/1biot/fiquela-api)
-
 #### Digital Ocean
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/1biot/fiquela-api/tree/main?refcode=92025543cb9f)
