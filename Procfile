@@ -1,1 +1,1 @@
-web: vendor/bin/heroku-php-nginx -C config/do/nginx_app.conf public/
+web: mkdir -p temp logs workspace && vendor/bin/heroku-php-nginx -C config/do/nginx_app.conf public/
