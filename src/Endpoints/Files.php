@@ -4,6 +4,7 @@ namespace Api\Endpoints;
 
 use Api;
 use FQL;
+use FQL\Enum\Format;
 use Slim\Psr7;
 
 /**
@@ -72,9 +73,23 @@ class Files extends Controller
             $workspace = $this->getWorkspace($request);
             $schema = $this->validateFile($workspace, $args);
             $data = $this->validateRequest($request, new Api\Schemas\UpdateFile);
-            $updatedSchema = array_merge($schema, $data);
-            $workspace->saveSchema($updatedSchema);
-            return $this->json($response, $updatedSchema);
+
+            if (isset($data['params']) && $data['params'] !== null) {
+                $schema['params'] = $data['params'];
+            }
+            if (array_key_exists('query', $data)) {
+                $schema['query'] = $data['query'];
+            }
+
+            $params = $schema['params'] ?? [];
+            if ($params !== [] && !empty($schema['type'])) {
+                Format::fromExtension($schema['type'])->validateParams($params);
+            }
+
+            $workspace->saveSchema($schema);
+            return $this->json($response, $schema);
+        } catch (FQL\Exception\InvalidFormatException $e) {
+            return $this->json($response, ['error' => $e->getMessage()], 422);
         } catch (\RuntimeException $e) {
             return $this->json($response, ['error' => $e->getMessage()], 500);
         }

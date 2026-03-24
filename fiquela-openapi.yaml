@@ -67,12 +67,13 @@ components:
         type:
           type: string
           nullable: true
-        encoding:
-          type: string
+        params:
+          type: object
           nullable: true
-        delimiter:
-          type: string
-          nullable: true
+          additionalProperties:
+            type: string
+            nullable: true
+          description: "Format-specific parameters (e.g. encoding, delimiter, useHeader for CSV)"
         query:
           type: string
           nullable: true
@@ -85,16 +86,16 @@ components:
           type: "string"
         name:
           type: "string"
-        encoding:
-          type: "string"
-          nullable: true
         type:
           type: "string"
+        params:
+          type: "object"
+          additionalProperties:
+            type: "string"
+            nullable: true
+          description: "Format-specific parameters (e.g. encoding, delimiter, useHeader for CSV)"
         size:
           type: "integer"
-        delimiter:
-          type: "string"
-          nullable: true
         query:
           type: "string"
           nullable: true
@@ -153,12 +154,13 @@ components:
     FileUpdateSchema:
       type: object
       properties:
-        delimiter:
-          type: string
+        params:
+          type: object
           nullable: true
-        encoding:
-          type: string
-          nullable: true
+          additionalProperties:
+            type: string
+            nullable: true
+          description: "Format-specific parameters (e.g. encoding, delimiter, useHeader for CSV)"
         query:
           type: string
           nullable: true
@@ -307,8 +309,8 @@ paths:
               url: "https://example.com/file.xml"
               name: "file.xml"
               type: "xml"
-              encoding: "utf-8"
-              delimiter: null
+              params:
+                encoding: "utf-8"
               query: "channel.items"
           multipart/form-data:
             schema:
@@ -330,10 +332,10 @@ paths:
                 schema:
                   uuid: "12345678-1234-5678-1234-123456789012"
                   name: "example.xml"
-                  encoding: "utf-8"
                   type: "xml"
+                  params:
+                    encoding: "utf-8"
                   size: 123456
-                  delimiter: null
                   query: "channel.items"
                   count: 100
                   columns:
@@ -392,10 +394,10 @@ paths:
               example:
                 uuid: "12345678-1234-5678-1234-123456789012"
                 name: "example.xml"
-                encoding: "utf-8"
                 type: "xml"
+                params:
+                  encoding: "utf-8"
                 size: 123456
-                delimiter: null
                 query: "channel.items"
                 count: 100
                 columns:
@@ -411,6 +413,7 @@ paths:
                     completeness: 0.98
                     constant: false
                     isEnum: false
+                    isUnique: true
                   - column: "images"
                     types:
                       array: 234
@@ -426,6 +429,7 @@ paths:
                     completeness: 0.98
                     constant: false
                     isEnum: false
+                    isUnique: false
       summary: Get file schema or info
     post:
       security:
@@ -444,8 +448,8 @@ paths:
             schema:
               $ref: '#/components/schemas/FileUpdateSchema'
             example:
-              delimiter: null
-              encoding: "utf-8"
+              params:
+                encoding: "utf-8"
               query: "channel.items"
         required: true
       responses:
@@ -465,10 +469,10 @@ paths:
                 schema:
                   uuid: "12345678-1234-5678-1234-123456789012"
                   name: "example.xml"
-                  encoding: "utf-8"
                   type: "xml"
+                  params:
+                    encoding: "utf-8"
                   size: 123456
-                  delimiter: null
                   query: "channel.items"
                   count: 100
                   columns:
@@ -527,7 +531,7 @@ paths:
             examples:
               Without file:
                 value:
-                  query: "SELECT * FROM [xml](file.xml).channel.item WHERE code = '1234'"
+                  query: "SELECT * FROM xml(file.xml).channel.item WHERE code = '1234'"
               With file:
                 value:
                   query: "SELECT * FROM channel.item WHERE price < 250"
@@ -550,7 +554,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/QueryResultSchema'
               example:
-                query: "SELECT * FROM [xml](file.xml).channel.item WHERE code = '1234'"
+                query: "SELECT * FROM xml(file.xml).channel.item WHERE code = '1234'"
                 file: "file.xml"
                 hash: "ef0b589d95c65a6a4f7c075c59e1a3aa"
                 data:
@@ -623,10 +627,10 @@ paths:
                       type: string
                       description: "SQL-like query executed"
               example:
-                - runs: "SELECT * FROM [xml](file.xml).channel.item WHERE code = '1234'"
+                - runs: "SELECT * FROM xml(file.xml).channel.item WHERE code = '1234'"
                   query: "select * from (file.xml).channel.item where code = '1234'"
                   created_at: "2023-10-01T12:00:00Z"
-                - runs: "SELECT * FROM [xml](file.xml).channel.item WHERE price < 250"
+                - runs: "SELECT * FROM xml(file.xml).channel.item WHERE price < 250"
                   query: "select * from channel.item where price < 250"
                   created_at: "2023-10-01T12:01:00Z"
       summary: List of file processing history
@@ -668,10 +672,10 @@ paths:
                       type: string
                       description: "SQL-like query executed"
               example:
-                - runs: "SELECT * FROM [xml](file.xml).channel.item WHERE code = '1234'"
+                - runs: "SELECT * FROM xml(file.xml).channel.item WHERE code = '1234'"
                   query: "select * from (file.xml).channel.item where code = '1234'"
                   created_at: "2023-10-01T12:00:00Z"
-                - runs: "SELECT * FROM [xml](file.xml).channel.item WHERE price < 250"
+                - runs: "SELECT * FROM xml(file.xml).channel.item WHERE price < 250"
                   query: "select * from channel.item where price < 250"
                   created_at: "2023-10-01T12:01:00Z"
       summary: List of file processing history

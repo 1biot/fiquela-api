@@ -39,9 +39,8 @@ use Symfony\Component\Uid\Uuid;
  *     originalName: string,
  *     name: string,
  *     type: string,
- *     encoding: ?string,
+ *     params: array<string, mixed>,
  *     size: int,
- *     delimiter: ?string,
  *     query: ?string,
  *     count: int,
  *     columns: Column[]
@@ -172,25 +171,27 @@ class Workspace
      */
     protected function schemaToFileQuery(array $schema): string
     {
-        $fileQuery = '';
-        if (isset($schema['type']) && $schema['type'] !== '') {
-            $fileQuery .= sprintf('[%s]', $schema['type']);
-        }
+        $format = $schema['type'] ?? '';
+        $filePath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
 
-        $fileProperties = [];
-        if (isset($schema['name']) && $schema['name'] !== '') {
-            // use correct file name path
-            $fileProperties[] = $this->getFilesPath() . DIRECTORY_SEPARATOR . $schema['name'];
-        }
+        $paramParts = [$filePath];
+        $params = $schema['params'] ?? [];
 
-        if (isset($schema['encoding']) && $schema['encoding'] !== '') {
-            $fileProperties[] = $schema['encoding'];
-            if (isset($schema['delimiter']) && $schema['delimiter'] !== '') {
-                $fileProperties[] = sprintf('"%s"', $schema['delimiter']);
+        if ($params !== [] && $format !== '') {
+            $formatEnum = Format::fromExtension($format);
+            $defaults = $formatEnum->getDefaultParams();
+
+            foreach ($params as $key => $value) {
+                if (isset($defaults[$key]) && $defaults[$key] === $value) {
+                    continue;
+                }
+                if ($value !== null && $value !== '') {
+                    $paramParts[] = sprintf('%s: "%s"', $key, $value);
+                }
             }
         }
 
-        $fileQuery .= sprintf('(%s)', implode(',', $fileProperties));
+        $fileQuery = $format . sprintf('(%s)', implode(', ', $paramParts));
 
         if (isset($schema['query']) && $schema['query'] !== '') {
             $fileQuery .= '.' . $schema['query'];
@@ -232,10 +233,9 @@ class Workspace
             'uuid' => Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_DNS), $uploadedFile->getClientFilename())->toRfc4122(),
             'originalName' => $uploadedFile->getClientFilename(),
             'name' => $this->normalizeFilename($uploadedFile->getClientFilename()),
-            'encoding' => null,
             'type' => $format->value,
+            'params' => [],
             'size' => $uploadedFile->getSize(),
-            'delimiter' => null,
             'query' => null,
             'count' => 0,
             'columns' => [],
@@ -253,10 +253,9 @@ class Workspace
             'uuid' => Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_DNS), $file->getFilename())->toRfc4122(),
             'originalName' => $file->getFilename(),
             'name' => $this->normalizeFilename($file->getFilename()),
-            'encoding' => null,
             'type' => $format->value,
+            'params' => [],
             'size' => $file->getSize(),
-            'delimiter' => null,
             'query' => null,
             'count' => 0,
             'columns' => [],
@@ -498,11 +497,17 @@ class Workspace
                 continue;
             }
 
-            $schemas[] = json_decode(
+            $schema = json_decode(
                 file_get_contents($this->getSchemasPath() . DIRECTORY_SEPARATOR . $file),
                 true,
                 flags: JSON_OBJECT_AS_ARRAY
             );
+
+            if ($this->migrateSchema($schema)) {
+                $this->saveSchema($schema);
+            }
+
+            $schemas[] = $schema;
         }
 
         return $schemas;
@@ -721,13 +726,35 @@ class Workspace
             return $extensionEnum->value;
         });
         $schema = $this->createSchemaFromDownloadedFile($downloadedFile, $format);
-        $schema['encoding'] = $data['encoding'] ?? null;
-        $schema['delimiter'] = $data['delimiter'] ?? null;
+        $schema['params'] = $data['params'] ?? [];
         $schema['query'] = $data['query'] ?? null;
+
+        if ($schema['params'] !== []) {
+            $format->validateParams($schema['params']);
+        }
         chmod($downloadedFile, 0644);
         $this->s3Sync?->uploadFile($downloadedFile, 'files/' . $schema['name']);
         $this->saveSchema($schema);
         return $schema;
+    }
+
+    private function migrateSchema(array &$schema): bool
+    {
+        if (array_key_exists('params', $schema)) {
+            return false;
+        }
+
+        $params = [];
+        if (!empty($schema['encoding'])) {
+            $params['encoding'] = $schema['encoding'];
+        }
+        if (!empty($schema['delimiter'])) {
+            $params['delimiter'] = $schema['delimiter'];
+        }
+
+        $schema['params'] = $params;
+        unset($schema['encoding'], $schema['delimiter']);
+        return true;
     }
 
     private function normalizeQuery(string $queryString): string

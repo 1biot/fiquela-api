@@ -11,8 +11,7 @@ class UpdateFile implements Schema
     public function getSchema(): Structure|Type
     {
         return Expect::array([
-            'encoding' => Expect::string()->nullable(),
-            'delimiter' => Expect::string()->nullable(),
+            'params' => Expect::arrayOf(Expect::string()->nullable())->nullable(),
             'query' => Expect::string()->nullable(),
         ]);
     }

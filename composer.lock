@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "1biot/fiquela",
-            "version": "v2.7.2",
+            "version": "v2.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/1biot/FiQueLa.git",
-                "reference": "719c4b74e6d04396ee2c49d24664dfad5561b76c"
+                "reference": "8f810407c4bfccc9ea2760639e58eb5d8023118a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/719c4b74e6d04396ee2c49d24664dfad5561b76c",
-                "reference": "719c4b74e6d04396ee2c49d24664dfad5561b76c",
+                "url": "https://api.github.com/repos/1biot/FiQueLa/zipball/8f810407c4bfccc9ea2760639e58eb5d8023118a",
+                "reference": "8f810407c4bfccc9ea2760639e58eb5d8023118a",
                 "shasum": ""
             },
             "require": {
@@ -55,9 +55,9 @@
             "description": "FiQueLa - File Query Language - PHP library for querying files",
             "support": {
                 "issues": "https://github.com/1biot/FiQueLa/issues",
-                "source": "https://github.com/1biot/FiQueLa/tree/v2.7.2"
+                "source": "https://github.com/1biot/FiQueLa/tree/v2.8.0"
             },
-            "time": "2026-03-20T21:16:59+00:00"
+            "time": "2026-03-23T11:34:29+00:00"
         },
         {
             "name": "aws/aws-crt-php",

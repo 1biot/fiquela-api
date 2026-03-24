@@ -15,8 +15,7 @@ class DownloadFile implements Schema
                 'url' => Expect::string()->required(),
                 'name' => Expect::string()->nullable(),
                 'type' => Expect::string()->nullable(),
-                'encoding' => Expect::string()->nullable(),
-                'delimiter' => Expect::string()->nullable(),
+                'params' => Expect::arrayOf(Expect::string()->nullable())->nullable(),
                 'query' => Expect::string()->nullable()
             ]
         );
