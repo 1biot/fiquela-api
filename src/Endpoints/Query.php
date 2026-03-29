@@ -4,6 +4,7 @@ namespace Api\Endpoints;
 
 use Api;
 use Api\Utils\Stopwatch;
+use FQL\Exception\FileAlreadyExistsException;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
 use Nette\Schema\ValidationException;
@@ -26,8 +27,28 @@ class Query extends Controller
             $refresh = $data['refresh'] ?? false;
             $query = $data['query'] ?? '';
 
-            [$cachedQuery, $originQueryHash, $originalFileQuery] = $workspace->runQuery($query, $file, $refresh);
-            $count = $cachedQuery->execute()->count();
+            $result = $workspace->runQuery($query, $file, $refresh);
+
+            if ($result->workspaceChanged && $result->intoSchema !== null) {
+                $responseData = [
+                    'query' => (string) $query,
+                    'file' => $file,
+                    'hash' => $result->hash,
+                    'data' => [$result->intoSchema],
+                    'elapsed' => round(Stopwatch::stop('query') * 1000, 2),
+                    'pagination' => [
+                        'page' => 1,
+                        'pageCount' => 1,
+                        'itemCount' => 1,
+                        'itemsPerPage' => 1,
+                        'offset' => 0,
+                    ],
+                    'workspaceChanged' => true,
+                ];
+                return $this->json($response, $responseData, 201);
+            }
+
+            $count = $result->query->execute()->count();
 
             $paginator = new Utils\Paginator;
             $paginator->setItemCount($count);
@@ -35,29 +56,32 @@ class Query extends Controller
             $paginator->setItemsPerPage(min(self::DefaultLimit, $count, (int) ($data['limit'] ?? self::DefaultLimit)));
 
             if ($paginator->getPageCount() > 1) {
-                $cachedQuery->offset($paginator->getOffset())
+                $result->query->offset($paginator->getOffset())
                     ->limit($paginator->getItemsPerPage());
             }
 
-            return $this->json(
-                $response,
-                [
-                    'query' => (string) $query,
-                    'file' => $file,
-                    'hash' => $originQueryHash,
-                    'data' => iterator_to_array($cachedQuery->execute()->getIterator()),
-                    'elapsed' => round(Stopwatch::stop('query') * 1000, 2), // in milliseconds
-                    'pagination' => [
-                        'page' => $paginator->getPage(),
-                        'pageCount' => $paginator->getPageCount(),
-                        'itemCount' => $paginator->getItemCount(),
-                        'itemsPerPage' => $paginator->getItemsPerPage(),
-                        'offset' => $paginator->getOffset(),
-                    ],
-                ]
-            );
+            $responseData = [
+                'query' => (string) $query,
+                'file' => $file,
+                'hash' => $result->hash,
+                'data' => iterator_to_array($result->query->execute()->getIterator()),
+                'elapsed' => round(Stopwatch::stop('query') * 1000, 2),
+                'pagination' => [
+                    'page' => $paginator->getPage(),
+                    'pageCount' => $paginator->getPageCount(),
+                    'itemCount' => $paginator->getItemCount(),
+                    'itemsPerPage' => $paginator->getItemsPerPage(),
+                    'offset' => $paginator->getOffset(),
+                ],
+            ];
+
+            return $this->json($response, $responseData);
         } catch (ValidationException $e) {
             throw new Api\Exceptions\UnprocessableContentHttpException($request, previous: $e);
+        } catch (Api\Exceptions\IntoTopLevelValidationException $e) {
+            throw new Api\Exceptions\UnprocessableQueryHttpException($request, $e->getMessage(), $e);
+        } catch (FileAlreadyExistsException $e) {
+            throw new Api\Exceptions\ConflictHttpException($request, 'INTO target file already exists.', $e);
         } catch (FileNotFoundException $e) {
             throw new Exception\HttpNotFoundException($request, previous: $e);
         } catch (InvalidFormatException $e) {

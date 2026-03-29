@@ -121,6 +121,16 @@ POST /api/v1/query
 }
 ```
 
+If query uses `INTO` and creates a new workspace file, response includes:
+
+```json
+{
+  "workspaceChanged": true
+}
+```
+
+When `workspaceChanged` is present, refresh `/api/v1/files` to get the updated file list.
+
 ---
 
 ## 🔧 Installation & Setup

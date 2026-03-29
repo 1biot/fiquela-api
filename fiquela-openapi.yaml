@@ -201,6 +201,9 @@ components:
             additionalProperties: true
         elapsed:
           type: number
+        workspaceChanged:
+          type: boolean
+          description: Present and true when query changed workspace files (for example via INTO)
         pagination:
           $ref: '#/components/schemas/PaginationSchema'
       required:
@@ -542,10 +545,14 @@ paths:
                   file: "file.xml"
                   limit: 10
                   page: 1
+              With INTO:
+                value:
+                  query: "SELECT * FROM channel.item INTO csv(output.csv)"
+                  file: "file.xml"
         required: true
       responses:
         '200':
-          description: Successful response
+          description: Query results
           headers:
             X-Api-Version:
               $ref: '#/components/headers/ApiVersionHeader'
@@ -554,7 +561,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/QueryResultSchema'
               example:
-                query: "SELECT * FROM xml(file.xml).channel.item WHERE code = '1234'"
+                query: "SELECT * FROM xml(file.xml).channel.item WHERE price < 250"
                 file: "file.xml"
                 hash: "ef0b589d95c65a6a4f7c075c59e1a3aa"
                 data:
@@ -562,12 +569,70 @@ paths:
                     price: 100.0
                   - title: "Item 2"
                     price: 200.0
-                elapsed: 0.123
+                elapsed: 12.34
                 pagination:
                   page: 1
-                  pageCount: 10
-                  itemCount: 100
-                  itemsPerPage: 10
+                  pageCount: 1
+                  itemCount: 2
+                  itemsPerPage: 2
+                  offset: 0
+        '201':
+          description: INTO query created a new workspace file
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResultSchema'
+              example:
+                query: "SELECT * FROM xml(file.xml).channel.item INTO csv(output.csv)"
+                file: "file.xml"
+                hash: "ef0b589d95c65a6a4f7c075c59e1a3aa"
+                data:
+                  - uuid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    originalName: "output.csv"
+                    name: "output.csv"
+                    type: "csv"
+                    params:
+                      encoding: "utf-8"
+                      delimiter: ","
+                      useHeader: "1"
+                    size: 1234
+                    query: null
+                    count: 2
+                    columns:
+                      - column: "title"
+                        types:
+                          string: 2
+                        totalRows: 2
+                        totalTypes: 1
+                        dominant: "string"
+                        suspicious: false
+                        confidence: 1.0
+                        completeness: 1.0
+                        constant: false
+                        isEnum: true
+                        isUnique: true
+                      - column: "price"
+                        types:
+                          double: 2
+                        totalRows: 2
+                        totalTypes: 1
+                        dominant: "double"
+                        suspicious: false
+                        confidence: 1.0
+                        completeness: 1.0
+                        constant: false
+                        isEnum: true
+                        isUnique: true
+                elapsed: 45.67
+                workspaceChanged: true
+                pagination:
+                  page: 1
+                  pageCount: 1
+                  itemCount: 1
+                  itemsPerPage: 1
                   offset: 0
   /api/v1/export/{hash}:
     get:

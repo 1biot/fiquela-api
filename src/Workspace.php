@@ -2,13 +2,14 @@
 
 namespace Api;
 
+use Api\Exceptions\IntoTopLevelValidationException;
 use Api\Storage\S3Sync;
 use Api\Utils\Downloader;
 use FQL\Enum\Format;
-use FQL\Enum\Type;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
 use FQL\Interface;
+use FQL\Results\DescribeResult;
 use FQL\Results\Stream as StreamResults;
 use FQL\Query;
 use FQL\Sql;
@@ -125,11 +126,11 @@ class Workspace
     }
 
     /**
-     * @return array{0: Interface\Query, 1: string, 2: Query\FileQuery}
      * @throws InvalidFormatException
      * @throws FileNotFoundException
+     * @throws IntoTopLevelValidationException
      */
-    public function runQuery(string $query, ?string $fileName = null, bool $refresh = false): array
+    public function runQuery(string $query, ?string $fileName = null, bool $refresh = false): QueryResult
     {
         if ($fileName !== null) {
             $schema = $this->getSchemaByFileName($fileName);
@@ -146,6 +147,12 @@ class Workspace
             ? $sqlQuery->parseWithQuery($queryObject)
             : $sqlQuery->toQuery();
 
+        $workspaceChanged = false;
+        $intoFileQuery = $queryObject->hasInto() ? $queryObject->getInto() : null;
+        if ($intoFileQuery !== null) {
+            $this->validateIntoTopLevel($intoFileQuery);
+        }
+
         $cacheFile = $this->getQueryCacheFile($queryObject);
         if ($refresh && file_exists($cacheFile)) {
             unlink($cacheFile); // invalidate
@@ -155,6 +162,19 @@ class Workspace
             $this->saveQueryResult($queryObject);
         }
 
+        $intoSchema = null;
+        if ($intoFileQuery !== null) {
+            $intoTarget = $this->queryResultExists($queryObject)
+                ? Stream\JsonStream::open($cacheFile)->query()
+                : $queryObject;
+
+            $intoTarget->execute(StreamResults::class)->into($intoFileQuery);
+
+            $intoSchema = $this->createSchemaFromIntoFileQuery($intoFileQuery);
+            $this->saveSchema($intoSchema);
+            $workspaceChanged = true;
+        }
+
         $originalQuery = $queryObject;
         $originalFileQuery = $originalQuery->provideFileQuery();
         if ($this->queryResultExists($queryObject)) {
@@ -162,12 +182,77 @@ class Workspace
         }
 
         $this->logQuery($query, $originalQuery);
-        return [$queryObject, md5((string) $originalQuery), $originalFileQuery];
+        return new QueryResult(
+            query: $queryObject,
+            hash: md5((string) $originalQuery),
+            originalFileQuery: $originalFileQuery,
+            workspaceChanged: $workspaceChanged,
+            intoSchema: $intoSchema,
+        );
+    }
+
+    /**
+     * @throws IntoTopLevelValidationException
+     * @throws InvalidFormatException
+     */
+    private function validateIntoTopLevel(Query\FileQuery $into): void
+    {
+        if ($into->file === null) {
+            throw new InvalidFormatException('INTO target file is missing');
+        }
+
+        $filesPath = realpath($this->getFilesPath());
+        if ($filesPath === false) {
+            throw new InvalidFormatException('Workspace files path is invalid');
+        }
+
+        $targetPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $into->file);
+        $basePath = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filesPath), DIRECTORY_SEPARATOR);
+        $basePrefix = $basePath . DIRECTORY_SEPARATOR;
+
+        if (!str_starts_with($targetPath, $basePrefix) && $targetPath !== $basePath) {
+            throw new InvalidFormatException('Invalid path of file');
+        }
+
+        $relativePath = ltrim(substr($targetPath, strlen($basePath)), DIRECTORY_SEPARATOR);
+        if ($relativePath === '' || dirname($relativePath) !== '.' || basename($relativePath) !== $relativePath) {
+            throw new IntoTopLevelValidationException('INTO supports top-level file names only');
+        }
+    }
+
+    /**
+     * @param Query\FileQuery $into
+     * @return Schema
+     */
+    private function createSchemaFromIntoFileQuery(Query\FileQuery $into): array
+    {
+        if ($into->file === null || $into->extension === null) {
+            throw new InvalidFormatException('INTO target file is invalid');
+        }
+
+        $fileName = basename($into->file);
+        $filePath = $this->getFilesPath() . DIRECTORY_SEPARATOR . $fileName;
+        if (!file_exists($filePath)) {
+            throw new FileNotFoundException(sprintf('INTO file "%s" was not created', $fileName));
+        }
+
+        return [
+            'uuid' => Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_DNS), $fileName)->toRfc4122(),
+            'originalName' => $fileName,
+            'name' => $fileName,
+            'type' => $into->extension->value,
+            'params' => $into->params,
+            'size' => (int) filesize($filePath),
+            'query' => $into->query,
+            'count' => 0,
+            'columns' => [],
+        ];
     }
 
     /**
      * @param Schema $schema
      * @return string
+     * @throws InvalidFormatException
      */
     protected function schemaToFileQuery(array $schema): string
     {
@@ -207,7 +292,7 @@ class Workspace
         }
 
         $format = $this->getFileTypeFromUploadedFile($uploadedFile, function (string $extension) {
-            $extensionEnum = \FQL\Enum\Format::fromExtension($extension);
+            $extensionEnum = Format::fromExtension($extension);
             return $extensionEnum->value;
         });
         $schema = $this->createSchemaFromUploadedFile($uploadedFile, $format);
@@ -287,154 +372,13 @@ class Workspace
 
         try {
             $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
-            $counter = 0;
-            $arrayKeys = [];
-            $colEnumCheck = [];
-            $uniqueTrackers = [];
+            $describeResult = $queryObject->describe()->execute();
 
-            foreach ($queryObject->selectAll()->execute(StreamResults::class)->getIterator() as $item) {
-                $counter++;
-
-                // Flatten input row to support nested structures
-                $flattenedItem = $this->flattenItem($item);
-
-                // Track missing fields across rows
-                foreach (array_keys($arrayKeys) as $knownKey) {
-                    if (!array_key_exists($knownKey, $flattenedItem)) {
-                        $arrayKeys[$knownKey]['null'] = ($arrayKeys[$knownKey]['null'] ?? 0) + 1;
-                    }
-                }
-
-                foreach ($flattenedItem as $key => $value) {
-                    $type = Type::match($value);
-
-                    if (!isset($arrayKeys[$key])) {
-                        $arrayKeys[$key] = [];
-                    }
-
-                    $typeName = $value === null ? 'null' : $type->value;
-
-                    if (is_string($value)) {
-                        $trimmed = trim($value);
-                        if ($value === '') {
-                            $typeName = 'empty-string';
-                        } elseif ($trimmed === '') {
-                            $typeName = 'whitespace';
-                        } elseif (in_array(strtolower($value), ['yes', 'no'], true)) {
-                            $typeName = 'bool-string';
-                        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/', $value)) {
-                            $typeName = 'date-string';
-                        }
-                    }
-
-                    $arrayKeys[$key][$typeName] = ($arrayKeys[$key][$typeName] ?? 0) + 1;
-
-                    // Enum detection
-                    if (!isset($colEnumCheck[$key])) {
-                        $colEnumCheck[$key] = [];
-                    }
-
-                    if (is_array($colEnumCheck[$key]) && is_scalar($value)) {
-                        $stringValue = (string)$value;
-                        if ($stringValue !== '' && trim($stringValue) !== '') {
-                            $colEnumCheck[$key][$stringValue] = ($colEnumCheck[$key][$stringValue] ?? 0) + 1;
-                            if (count($colEnumCheck[$key]) > 5) {
-                                unset($colEnumCheck[$key]);
-                            }
-                        }
-                    } elseif (is_array($colEnumCheck[$key])) {
-                        unset($colEnumCheck[$key]);
-                    }
-
-                    // Unique value tracking
-                    if (!isset($uniqueTrackers[$key])) {
-                        $uniqueTrackers[$key] = [];
-                    }
-
-                    if (is_scalar($value) && !in_array($typeName, ['null', 'empty-string', 'whitespace'], true) && isset($uniqueTrackers[$key])) {
-                        $stringValue = (string)$value;
-                        if (isset($uniqueTrackers[$key][$stringValue])) {
-                            unset($uniqueTrackers[$key]); // not unique
-                        } else {
-                            $uniqueTrackers[$key][$stringValue] = true;
-                        }
-                    }
-                }
+            if ($describeResult instanceof DescribeResult) {
+                $schema['columns'] = iterator_to_array($describeResult->getIterator());
+                $schema['count'] = $describeResult->getSourceRowCount();
             }
 
-            $schema['columns'] = array_map(function ($key) use ($arrayKeys, $colEnumCheck, $counter, $uniqueTrackers) {
-                $emptyTypes = ['null', 'empty-string', 'whitespace'];
-                $types = $arrayKeys[$key];
-                $typeEntries = $types;
-
-                $total = array_sum($typeEntries);
-                $filledCount = array_sum(array_filter(
-                    $typeEntries,
-                    fn($count, $type) => !in_array($type, $emptyTypes, true),
-                    ARRAY_FILTER_USE_BOTH
-                ));
-                $totalTypes = count($typeEntries);
-
-                arsort($typeEntries);
-                $dominantType = $typeEntries ? array_key_first($typeEntries) : null;
-
-                $allTypeKeys = array_keys($typeEntries);
-                $filteredEmptyTypes = array_filter($allTypeKeys, fn($type) => in_array($type, $emptyTypes, true));
-                $nonEmptyTypes = array_diff($allTypeKeys, $filteredEmptyTypes);
-
-                $isNumericCombo = in_array('int', $nonEmptyTypes, true)
-                    && in_array('double', $nonEmptyTypes, true)
-                    && count($nonEmptyTypes) === 2;
-
-                $suspicious = count($filteredEmptyTypes) > 1
-                    || (count($nonEmptyTypes) > 1 && !$isNumericCombo);
-
-                $confidence = $total > 0 ? ($typeEntries[$dominantType] / $total) : 0.0;
-                $missingCount = array_sum(array_intersect_key($typeEntries, array_flip($emptyTypes)));
-                $completeness = $counter > 0 ? (($counter - $missingCount) / $counter) : 0.0;
-
-                $enumSet = $colEnumCheck[$key] ?? null;
-
-                $isEnum = false;
-                $isConstant = false;
-
-                if (is_array($enumSet)) {
-                    $uniqueCount = count($enumSet);
-                    $occurrenceCount = array_sum($enumSet);
-
-                    if ($uniqueCount === 1 && $occurrenceCount === $filledCount) {
-                        $isConstant = true;
-                    } elseif ($uniqueCount >= 2 && $uniqueCount <= 5 && $occurrenceCount === $filledCount && $completeness > 0.1) {
-                        $isEnum = true;
-                    }
-                }
-
-                $isUnique = false;
-                if (
-                    isset($uniqueTrackers[$key])
-                    && count($uniqueTrackers[$key]) > 0 // must contain some actual value
-                    && $filledCount > 0 // column must be filled at least once
-                    && count($uniqueTrackers[$key]) === $filledCount
-                ) {
-                    $isUnique = true;
-                }
-
-                return [
-                    'column' => $key,
-                    'types' => $types,
-                    'totalRows' => $filledCount,
-                    'totalTypes' => $totalTypes,
-                    'dominant' => $dominantType,
-                    'suspicious' => $suspicious,
-                    'confidence' => round($confidence, 4),
-                    'completeness' => round($completeness, 4),
-                    'constant' => $isConstant,
-                    'isEnum' => $isEnum,
-                    'isUnique' => $isUnique,
-                ];
-            }, array_keys($arrayKeys));
-
-            $schema['count'] = $counter;
             return true;
         } catch (\Exception $e) {
             $this->logger->error('Error while extending schema', ['exception' => $e]);
@@ -442,30 +386,6 @@ class Workspace
             $schema['count'] = 0;
             return false;
         }
-    }
-
-    /**
-     * Recursively flattens nested associative arrays into dot notation keys (up to 3 levels deep)
-     */
-    private function flattenItem(array $item, string $prefix = '', int $level = 0): array
-    {
-        if ($level >= 3) {
-            return [];
-        }
-
-        $flat = [];
-
-        foreach ($item as $key => $value) {
-            $path = $prefix !== '' ? "{$prefix}.{$key}" : $key;
-
-            if (is_array($value) && $this->isAssoc($value)) {
-                $flat += $this->flattenItem($value, $path, $level + 1);
-            } else {
-                $flat[$path] = $value;
-            }
-        }
-
-        return $flat;
     }
 
     public function logQuery(string $query, ?Interface\Query $queryObject = null): void
@@ -659,9 +579,9 @@ class Workspace
         }
     }
 
-    private function getFileTypeFromUploadedFile(UploadedFile $uploadedFile, ?callable $fallback = null): \FQL\Enum\Format
+    private function getFileTypeFromUploadedFile(UploadedFile $uploadedFile, ?callable $fallback = null): Format
     {
-        return \FQL\Enum\Format::from(match ($uploadedFile->getClientMediaType()) {
+        return Format::from(match ($uploadedFile->getClientMediaType()) {
             'text/csv' => 'csv',
             'application/json' => 'jsonFile',
             'text/xml', 'application/xml' => 'xml',
@@ -673,9 +593,9 @@ class Workspace
         });
     }
 
-    private function getFileTypeFromDownloadedFile(\SplFileInfo $downloadedFile, ?callable $fallback = null): \FQL\Enum\Format
+    private function getFileTypeFromDownloadedFile(\SplFileInfo $downloadedFile, ?callable $fallback = null): Format
     {
-        return \FQL\Enum\Format::from(match (mime_content_type($downloadedFile->getPathname())) {
+        return Format::from(match (mime_content_type($downloadedFile->getPathname())) {
             'text/csv' => 'csv',
             'application/json' => 'jsonFile',
             'text/xml', 'application/xml' => 'xml',
@@ -722,7 +642,7 @@ class Workspace
             $this->getFilesPath() . DIRECTORY_SEPARATOR . $data['name']
         );
         $format = $this->getFileTypeFromDownloadedFile($downloadedFile, function (string $extension) {
-            $extensionEnum = \FQL\Enum\Format::fromExtension($extension);
+            $extensionEnum = Format::fromExtension($extension);
             return $extensionEnum->value;
         });
         $schema = $this->createSchemaFromDownloadedFile($downloadedFile, $format);

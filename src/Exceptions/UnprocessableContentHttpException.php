@@ -3,9 +3,9 @@
 namespace Api\Exceptions;
 
 use Nette\Schema\ValidationException;
-use Slim\Exception\HttpException;
+use Slim\Exception\HttpSpecializedException;
 
-class UnprocessableContentHttpException extends HttpException
+class UnprocessableContentHttpException extends HttpSpecializedException
 {
     /**
      * @var int
