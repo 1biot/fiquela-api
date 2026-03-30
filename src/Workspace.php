@@ -168,7 +168,7 @@ class Workspace
                 ? Stream\JsonStream::open($cacheFile)->query()
                 : $queryObject;
 
-            $intoTarget->execute(StreamResults::class)->into($intoFileQuery);
+            $intoFileQuery = $intoTarget->execute(StreamResults::class)->into($intoFileQuery);
 
             $intoSchema = $this->createSchemaFromIntoFileQuery($intoFileQuery);
             $this->saveSchema($intoSchema);
