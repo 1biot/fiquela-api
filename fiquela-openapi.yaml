@@ -5,8 +5,6 @@ openapi: 3.0.3
 servers:
   - url: http://localhost:6917
     description: Local server
-  - url: https://fiquela.preved.to
-    description: Online test server
 tags:
   - name: Auth
     description: Authentication operations
@@ -14,6 +12,14 @@ tags:
     description: File management operations
   - name: Query
     description: SQL-like query execution for files
+  - name: Status
+    description: API status and workspace information
+  - name: Export
+    description: Export query results in various formats
+  - name: History
+    description: Workspace change history
+  - name: Health
+    description: Health check endpoint
 components:
   securitySchemes:
     bearerAuth:
@@ -29,15 +35,16 @@ components:
     AuthRequest:
       type: object
       properties:
-        user:
+        username:
           type: string
           example: novak
-        secret:
+        password:
           type: string
+          description: "Min 8 chars, must contain lowercase, uppercase, digit and special character (!@#$%^&*()_+)"
           example: SuperSecret123!
       required:
-        - user
-        - secret
+        - username
+        - password
     AuthResponse:
       type: object
       properties:
@@ -50,10 +57,8 @@ components:
       type: object
       properties:
         file:
-          type: array
-          items:
-            type: string
-            format: binary
+          type: string
+          format: binary
       required:
         - file
     DownloadSchema:
@@ -175,10 +180,12 @@ components:
         limit:
           type: integer
           nullable: true
+          minimum: 1
           maximum: 1000
         page:
           type: integer
           nullable: true
+          minimum: 1
         refresh:
           type: boolean
           nullable: true
@@ -226,6 +233,28 @@ components:
           type: integer
         offset:
           type: integer
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "HTTP error title (e.g. '401 Unauthorized')"
+        code:
+          type: integer
+          description: "HTTP status code"
+        message:
+          type: string
+          description: "Error message"
+        description:
+          type: string
+          description: "Detailed error description"
+        details:
+          description: "Additional error details (validation errors or previous exception message)"
+      required:
+        - error
+        - code
+        - message
+        - description
 paths:
   /api/auth/login:
     post:
@@ -251,6 +280,22 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error (missing or invalid username/password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/auth/revoke:
     post:
       security: []
@@ -281,6 +326,81 @@ paths:
                   - revoked
         '401':
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error (missing or invalid username/password)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/status:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Status
+      summary: Get API status and workspace information
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Api-Version:
+              $ref: '#/components/headers/ApiVersionHeader'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2026-04-05T12:00:00+02:00"
+                  version:
+                    type: string
+                    example: "v1"
+                  fiquela_version:
+                    type: string
+                    example: "2.0.0"
+                  workspace:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "default"
+                      readonly:
+                        type: boolean
+                        example: false
+                      s3:
+                        type: boolean
+                        example: false
+                    required:
+                      - id
+                      - readonly
+                      - s3
+                required:
+                  - status
+                  - timestamp
+                  - version
+                  - fiquela_version
+                  - workspace
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/files:
     get:
       security:
@@ -297,14 +417,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FilesSchema'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: List of files
     post:
       security:
         - bearerAuth: [ ]
       tags:
         - Files
+      summary: Add file to workspace
+      description: |
+        Add a file to the workspace. Two methods are supported — select the content type to switch between them:
+        - **multipart/form-data** — upload a local file directly
+        - **application/json** — download a file from a remote URL
       requestBody:
+        required: true
         content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadSchema'
           application/json:
             schema:
               $ref: '#/components/schemas/DownloadSchema'
@@ -315,9 +456,6 @@ paths:
               params:
                 encoding: "utf-8"
               query: "channel.items"
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UploadSchema'
       responses:
         '200':
           description: Successful response
@@ -331,47 +469,18 @@ paths:
                 properties:
                   schema:
                     $ref: '#/components/schemas/FileSchema'
-              example:
-                schema:
-                  uuid: "12345678-1234-5678-1234-123456789012"
-                  name: "example.xml"
-                  type: "xml"
-                  params:
-                    encoding: "utf-8"
-                  size: 123456
-                  query: "channel.items"
-                  count: 100
-                  columns:
-                    - column: "title"
-                      types:
-                        string: 23
-                        empty-string: 12
-                      totalRows: 35
-                      totalTypes: 2
-                      dominant: "string"
-                      suspicious: false
-                      confidence: 0.95
-                      completeness: 0.98
-                      constant: false
-                      isEnum: false
-                      isUnique: true
-                    - column: "images"
-                      types:
-                        array: 234
-                    - column: "price"
-                      types:
-                        int: 98
-                        double: 12
-                      totalRows: 110
-                      totalTypes: 2
-                      dominant: "int"
-                      suspicious: false
-                      confidence: 0.95
-                      completeness: 0.98
-                      constant: false
-                      isEnum: false
-                      isUnique: false
-      summary: Upload file from remote URL or local file
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/files/{uuid}:
     get:
       security:
@@ -384,9 +493,16 @@ paths:
           required: true
           schema:
             type: string
+        - in: query
+          name: raw
+          required: false
+          description: "When true, returns the raw file as binary download"
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
-          description: Successful response
+          description: File schema (default) or raw file download (when raw=true)
           headers:
             X-Api-Version:
               $ref: '#/components/headers/ApiVersionHeader'
@@ -394,46 +510,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FileSchema'
-              example:
-                uuid: "12345678-1234-5678-1234-123456789012"
-                name: "example.xml"
-                type: "xml"
-                params:
-                  encoding: "utf-8"
-                size: 123456
-                query: "channel.items"
-                count: 100
-                columns:
-                  - column: "title"
-                    types:
-                      string: 23
-                      empty-string: 12
-                    totalRows: 35
-                    totalTypes: 2
-                    dominant: "string"
-                    suspicious: false
-                    confidence: 0.95
-                    completeness: 0.98
-                    constant: false
-                    isEnum: false
-                    isUnique: true
-                  - column: "images"
-                    types:
-                      array: 234
-                  - column: "price"
-                    types:
-                      int: 98
-                      double: 12
-                    totalRows: 110
-                    totalTypes: 2
-                    dominant: "int"
-                    suspicious: false
-                    confidence: 0.95
-                    completeness: 0.98
-                    constant: false
-                    isEnum: false
-                    isUnique: false
-      summary: Get file schema or info
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                description: "Raw file download (when raw=true)"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Get file detail or download raw file
     post:
       security:
         - bearerAuth: [ ]
@@ -464,33 +558,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  schema:
-                    $ref: '#/components/schemas/FileSchema'
-              example:
-                schema:
-                  uuid: "12345678-1234-5678-1234-123456789012"
-                  name: "example.xml"
-                  type: "xml"
-                  params:
-                    encoding: "utf-8"
-                  size: 123456
-                  query: "channel.items"
-                  count: 100
-                  columns:
-                    - column: "title"
-                      types:
-                        string: 23
-                        empty-string: 12
-                    - column: "images"
-                      types:
-                        array: 234
-                    - column: "price"
-                      types:
-                        int: 98
-                        double: 12
-      summary: Generate query-based export for file
+                $ref: '#/components/schemas/FileSchema'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid format parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Update file metadata
     delete:
       security:
         - bearerAuth: [ ]
@@ -516,9 +603,25 @@ paths:
                   message:
                     type: string
                     example: File deleted
-              example:
-                message: "File deleted successfully"
-      summary: Generate query-based export for file
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Delete file from workspace
   /api/v1/query:
     post:
       security:
@@ -634,6 +737,42 @@ paths:
                   itemCount: 1
                   itemsPerPage: 1
                   offset: 0
+        '400':
+          description: Invalid format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: INTO target file already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation or query error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/export/{hash}:
     get:
       security:
@@ -652,16 +791,72 @@ paths:
           schema:
             type: string
             enum:
+              - json
+              - ndjson
               - csv
               - tsv
-              - json
+            default: json
+        - in: query
+          name: delimiter
+          required: false
+          description: "Custom delimiter for CSV/TSV export"
+          schema:
+            type: string
+        - in: query
+          name: force
+          required: false
+          description: "When true, forces download with Content-Disposition attachment header"
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
-          description: Successful response
+          description: Exported data in the requested format
           headers:
             X-Api-Version:
               $ref: '#/components/headers/ApiVersionHeader'
-      summary: Export a file in specific format
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+            application/x-ndjson:
+              schema:
+                type: string
+                description: "Newline-delimited JSON"
+            text/csv:
+              schema:
+                type: string
+            text/tsv:
+              schema:
+                type: string
+        '400':
+          description: Invalid format or CSV error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invalid results hash
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Export query results in specific format
   /api/v1/history:
     get:
       security:
@@ -698,6 +893,24 @@ paths:
                 - runs: "SELECT * FROM xml(file.xml).channel.item WHERE price < 250"
                   query: "select * from channel.item where price < 250"
                   created_at: "2023-10-01T12:01:00Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: History file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: List of file processing history
   /api/v1/history/{date}:
     get:
@@ -743,19 +956,39 @@ paths:
                 - runs: "SELECT * FROM xml(file.xml).channel.item WHERE price < 250"
                   query: "select * from channel.item where price < 250"
                   created_at: "2023-10-01T12:01:00Z"
-      summary: List of file processing history
-  /api/v1/ping:
+        '400':
+          description: Invalid date format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: History file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: List of file processing history by date
+  /api/ping:
     get:
-      security:
-        - bearerAuth: [ ]
+      security: []
       tags:
         - Health
       responses:
         '200':
           description: Successful response
-          headers:
-            X-Api-Version:
-              $ref: '#/components/headers/ApiVersionHeader'
           content:
             text/plain:
               example: "pong"

@@ -38,9 +38,25 @@ class Bootstrap
     {
         $app->add(Middlewares\CorsMiddleware::class);
         $app->get('/', function (Slim\Psr7\Request $request, Slim\Psr7\Response $response): Slim\Psr7\Response {
-            $response = $response->withStatus(200)->withHeader('Content-Type', 'text/plain');
-            $response->getBody()->write('FiQueLa API');
-            return $response;
+            $version = Bootstrap::getVersion();
+            $data = [
+                'name' => 'FiQueLa API',
+                'version' => $version,
+                'endpoints' => [
+                    'ping_url' => '/api/ping',
+                    'auth_login_url' => '/api/auth/login',
+                    'auth_revoke_url' => '/api/auth/revoke',
+                    'status_url' => '/api/status',
+                    'files_url' => "/api/{$version}/files",
+                    'file_url' => "/api/{$version}/files/{uuid}",
+                    'query_url' => "/api/{$version}/query",
+                    'export_url' => "/api/{$version}/export/{hash}",
+                    'history_url' => "/api/{$version}/history",
+                    'history_date_url' => "/api/{$version}/history/{date}",
+                ],
+            ];
+            $response->getBody()->write(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            return $response->withStatus(200)->withHeader('Content-Type', 'application/json');
         });
 
         $app->group('/api', function (RouteCollectorProxyInterface $apiGroup) {
