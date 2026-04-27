@@ -78,6 +78,14 @@ class Query extends Controller
             return $this->json($response, $responseData);
         } catch (ValidationException $e) {
             throw new Api\Exceptions\UnprocessableContentHttpException($request, previous: $e);
+        } catch (Api\Exceptions\LintValidationException $e) {
+            return $this->json(
+                $response,
+                ['error' => $e->getMessage(), 'issues' => $e->issues],
+                422
+            );
+        } catch (\FQL\Sql\Parser\ParseException $e) {
+            throw new Api\Exceptions\UnprocessableQueryHttpException($request, $e->getMessage(), $e);
         } catch (Api\Exceptions\IntoTopLevelValidationException $e) {
             throw new Api\Exceptions\UnprocessableQueryHttpException($request, $e->getMessage(), $e);
         } catch (FileAlreadyExistsException $e) {

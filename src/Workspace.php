@@ -3,16 +3,18 @@
 namespace Api;
 
 use Api\Exceptions\IntoTopLevelValidationException;
+use Api\Exceptions\LintValidationException;
 use Api\Storage\S3Sync;
 use Api\Utils\Downloader;
 use FQL\Enum\Format;
 use FQL\Exception\FileNotFoundException;
 use FQL\Exception\InvalidFormatException;
 use FQL\Interface;
+use FQL\Query;
 use FQL\Results\DescribeResult;
 use FQL\Results\Stream as StreamResults;
-use FQL\Query;
 use FQL\Sql;
+use FQL\Sql\Lint\Severity;
 use FQL\Stream;
 use FQL\Traits\Helpers\EnhancedNestedArrayAccessor;
 use Psr\Log\LoggerInterface;
@@ -129,9 +131,21 @@ class Workspace
      * @throws InvalidFormatException
      * @throws FileNotFoundException
      * @throws IntoTopLevelValidationException
+     * @throws LintValidationException
      */
     public function runQuery(string $query, ?string $fileName = null, bool $refresh = false): QueryResult
     {
+        $trimmedQuery = trim($query);
+
+        // FileNotFoundRule operates on raw AST paths (it doesn't know about Compiler basePath),
+        // so for relative file refs in the SQL it would false-positive. Compiler + runtime will
+        // still surface missing files as FileNotFoundException downstream.
+        $lintReport = Sql\Provider::lint($trimmedQuery, checkFilesystem: false);
+        $errors = $lintReport->filterBySeverity(Severity::ERROR);
+        if ($errors->count() > 0) {
+            throw new LintValidationException($errors->toArray());
+        }
+
         if ($fileName !== null) {
             $schema = $this->getSchemaByFileName($fileName);
             if (!$schema) {
@@ -141,11 +155,10 @@ class Workspace
             $queryObject = Query\Provider::fromFileQuery($this->schemaToFileQuery($schema));
         }
 
-        $sqlQuery = new Sql\Sql(trim($query));
-        $sqlQuery->setBasePath($this->getFilesPath());
+        $compiler = Sql\Provider::compile($trimmedQuery, $this->getFilesPath());
         $queryObject = isset($queryObject)
-            ? $sqlQuery->parseWithQuery($queryObject)
-            : $sqlQuery->toQuery();
+            ? $compiler->applyTo($queryObject)
+            : $compiler->toQuery();
 
         $workspaceChanged = false;
         $intoFileQuery = $queryObject->hasInto() ? $queryObject->getInto() : null;
@@ -532,6 +545,47 @@ class Workspace
         }
 
         return $historyResponse;
+    }
+
+    /**
+     * Renders a cached query result into a target export format using FQL's INTO writers.
+     * Returns the path to the generated file. The caller is responsible for streaming and
+     * deleting the file after the response is sent.
+     *
+     * `$format` is the FQL extension key (`csv`, `ndJson`, `xml`, `xls`, `ods`); `json`
+     * short-circuits to the existing cache file with no conversion.
+     *
+     * @param array<string, string> $params
+     * @throws FileNotFoundException
+     * @throws InvalidFormatException
+     */
+    public function exportCachedQuery(string $hash, string $format, array $params = []): string
+    {
+        $cacheFile = $this->getCachePath() . DIRECTORY_SEPARATOR . $hash . '.json';
+        if (!file_exists($cacheFile)) {
+            throw new FileNotFoundException('Cached query result not found');
+        }
+
+        if ($format === 'json') {
+            return $cacheFile;
+        }
+
+        $extension = Format::from($format);
+        $targetPath = sys_get_temp_dir()
+            . DIRECTORY_SEPARATOR
+            . 'fiquela-export-' . $hash . '-' . bin2hex(random_bytes(4)) . '.' . $extension->value;
+
+        $fileQuery = new Query\FileQuery(sprintf('%s(%s)', $extension->value, $targetPath));
+        foreach ($params as $key => $value) {
+            $fileQuery = $fileQuery->withParam($key, $value);
+        }
+
+        Stream\JsonStream::open($cacheFile)
+            ->query()
+            ->execute(StreamResults::class)
+            ->into($fileQuery);
+
+        return $targetPath;
     }
 
     public function invalidateCache(): void

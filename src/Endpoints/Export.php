@@ -2,12 +2,48 @@
 
 namespace Api\Endpoints;
 
+use Api;
 use FQL;
-use League\Csv;
+use Nette\Schema\ValidationException;
+use Slim\Exception;
 use Slim\Psr7;
 
 class Export extends Controller
 {
+    /** @var array<string, array{ext: string, contentType: string, allowed: list<string>}> */
+    private const FormatSpec = [
+        'json' => [
+            'ext' => 'json',
+            'contentType' => 'application/json',
+            'allowed' => [],
+        ],
+        'ndjson' => [
+            'ext' => 'ndJson',
+            'contentType' => 'application/x-ndjson',
+            'allowed' => [],
+        ],
+        'csv' => [
+            'ext' => 'csv',
+            'contentType' => 'text/csv',
+            'allowed' => ['delimiter', 'encoding', 'useHeader', 'enclosure', 'bom'],
+        ],
+        'xml' => [
+            'ext' => 'xml',
+            'contentType' => 'application/xml',
+            'allowed' => ['encoding'],
+        ],
+        'xlsx' => [
+            'ext' => 'xls',
+            'contentType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'allowed' => [],
+        ],
+        'ods' => [
+            'ext' => 'ods',
+            'contentType' => 'application/vnd.oasis.opendocument.spreadsheet',
+            'allowed' => [],
+        ],
+    ];
+
     public function __invoke(Psr7\Request $request, Psr7\Response $response, array $args): Psr7\Response
     {
         try {
@@ -17,103 +53,62 @@ class Export extends Controller
                 throw new \RuntimeException('Missing results hash');
             }
 
-            $file = $workspace->getCachePath() . DIRECTORY_SEPARATOR . sprintf('%s.json', $resultsHash);
-            if (file_exists($file) === false) {
-                throw new \RuntimeException('Invalid results hash');
+            $data = $this->validateQueryParams($request, new Api\Schemas\Export);
+            $format = strtolower((string) $data['format']);
+            $spec = self::FormatSpec[$format];
+
+            $params = [];
+            foreach ($spec['allowed'] as $key) {
+                if (isset($data[$key]) && $data[$key] !== '') {
+                    $params[$key] = (string) $data[$key];
+                }
             }
 
-            $format = strtolower($request->getQueryParams()['format'] ?? 'json');
-            $response = match ($format) {
-                'json', 'ndjson' => $this->createJsonResponse($response, $format, $file),
-                'csv', 'tsv' => $this->createDelimitedFileResponse(
-                    $response,
-                    $format,
-                    $file,
-                    $request->getQueryParams()['delimiter'] ?? null
-                ),
-                default => throw new \RuntimeException('Unsupported format: ' . $format),
-            };
+            $exportPath = $workspace->exportCachedQuery($resultsHash, $spec['ext'], $params);
+            $cacheFile = $workspace->getCachePath() . DIRECTORY_SEPARATOR . $resultsHash . '.json';
 
-            $forceDownload = $request->getQueryParams()['force'] ?? false;
-            if ($forceDownload) {
-                return $response->withHeader('Content-Disposition', 'attachment; filename="' . basename($file) . '"');
+            $stream = fopen($exportPath, 'rb');
+            if ($stream === false) {
+                throw new \RuntimeException('Failed to open exported file');
+            }
+
+            // Generated temp files (everything except the json cache file itself) are removed
+            // once the response stream closes — keeps sys_get_temp_dir() clean.
+            if ($exportPath !== $cacheFile) {
+                register_shutdown_function(static function () use ($exportPath): void {
+                    if (file_exists($exportPath)) {
+                        @unlink($exportPath);
+                    }
+                });
+            }
+
+            $response = $response->withBody(new Psr7\Stream($stream))
+                ->withHeader('Content-Type', $spec['contentType']);
+
+            if ($this->isTruthy($data['force'] ?? null)) {
+                $response = $response->withHeader(
+                    'Content-Disposition',
+                    'attachment; filename="' . $resultsHash . '.' . $spec['ext'] . '"'
+                );
             }
 
             return $response;
-        } catch (\RuntimeException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 500);
+        } catch (ValidationException $e) {
+            throw new Api\Exceptions\UnprocessableContentHttpException($request, previous: $e);
         } catch (FQL\Exception\FileNotFoundException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 404);
-        } catch (Csv\CannotInsertRecord|Csv\InvalidArgument|FQL\Exception\InvalidFormatException $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 400);
+            throw new Exception\HttpNotFoundException($request, previous: $e);
+        } catch (FQL\Exception\InvalidFormatException $e) {
+            throw new Exception\HttpBadRequestException($request, previous: $e);
         } catch (\Throwable $e) {
-            return $this->json($response, ['error' => $e->getMessage()], 500);
+            throw new Exception\HttpInternalServerErrorException($request, previous: $e);
         }
     }
 
-    /**
-     * @throws FQL\Exception\InvalidFormatException
-     * @throws FQL\Exception\FileNotFoundException
-     * @throws \Exception
-     */
-    private function createJsonResponse(Psr7\Response $response, string $format, string $file): Psr7\Response
+    private function isTruthy(mixed $value): bool
     {
-        $stream = null;
-        if ($format === 'json') {
-            $stream = fopen($file, 'rb');
-        } elseif ($format === 'ndjson') {
-            $stream = fopen('php://temp', 'r+');
-            $results = FQL\Query\Provider::fromFile($file)->selectAll()->execute(FQL\Results\Stream::class);
-            foreach ($results->getIterator() as $row) {
-                fwrite($stream, json_encode($row) . "\n");
-            }
-            rewind($stream);
+        if (is_bool($value)) {
+            return $value;
         }
-
-        if ($stream === false || $stream === null) {
-            throw new \RuntimeException('Failed to create a stream');
-        }
-
-        $contentType = match ($format) {
-            'json' => 'application/json',
-            'ndjson' => 'application/x-ndjson',
-        };
-
-        return $response->withBody(new Psr7\Stream($stream))
-            ->withHeader('Content-Type', $contentType);
-    }
-
-    /**
-     * @throws Csv\InvalidArgument
-     * @throws FQL\Exception\FileNotFoundException
-     * @throws FQL\Exception\InvalidFormatException
-     * @throws Csv\CannotInsertRecord
-     * @throws Csv\Exception
-     * @throws \Exception
-     */
-    private function createDelimitedFileResponse(
-        Psr7\Response $response,
-        string $format,
-        string $file,
-        ?string $delimiter
-    ): Psr7\Response {
-        $stream = fopen('php://temp', 'r+');
-        $csv = Csv\Writer::from($stream);
-        $csv->setDelimiter($delimiter ?? ($format === 'csv' ? ',' : "\t"));
-
-        $hasWrittenHeader = false;
-        $results = FQL\Query\Provider::fromFile($file)->selectAll()->execute(FQL\Results\Stream::class);
-        foreach ($results->getIterator() as $row) {
-            if ($hasWrittenHeader === false) {
-                $csv->insertOne(array_keys($row));
-                $hasWrittenHeader = true;
-            }
-
-            $csv->insertOne($row);
-        }
-
-        rewind($stream);
-        return $response->withBody(new Psr7\Stream($stream))
-            ->withHeader('Content-Type', sprintf('text/%s', $format));
+        return in_array((string) $value, ['1', 'true', 'yes', 'on'], true);
     }
 }

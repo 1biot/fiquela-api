@@ -788,27 +788,65 @@ paths:
         - in: query
           name: format
           required: false
+          description: "Target export format. `xlsx` writes an XLSX spreadsheet."
           schema:
             type: string
             enum:
               - json
               - ndjson
               - csv
-              - tsv
+              - xml
+              - xlsx
+              - ods
             default: json
         - in: query
           name: delimiter
           required: false
-          description: "Custom delimiter for CSV/TSV export"
+          description: "Single-character field delimiter for CSV."
           schema:
             type: string
+            minLength: 1
+            maxLength: 1
+        - in: query
+          name: enclosure
+          required: false
+          description: "Single-character field enclosure for CSV. Default `\"`."
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1
+            default: '"'
+        - in: query
+          name: useHeader
+          required: false
+          description: "Emit header row in CSV output. `1` = yes, `0` = no."
+          schema:
+            type: string
+            enum: ['0', '1']
+            default: '1'
+        - in: query
+          name: bom
+          required: false
+          description: "Emit a UTF-8 BOM in CSV output. `1` = yes, `0` = no."
+          schema:
+            type: string
+            enum: ['0', '1']
+            default: '0'
+        - in: query
+          name: encoding
+          required: false
+          description: "Output encoding for CSV/XML (any iconv-supported encoding name)."
+          schema:
+            type: string
+            default: utf-8
         - in: query
           name: force
           required: false
-          description: "When true, forces download with Content-Disposition attachment header"
+          description: "When `1`/`true`, forces download with Content-Disposition: attachment header."
           schema:
-            type: boolean
-            default: false
+            type: string
+            enum: ['0', '1', 'true', 'false']
+            default: '0'
       responses:
         '200':
           description: Exported data in the requested format
@@ -829,11 +867,21 @@ paths:
             text/csv:
               schema:
                 type: string
-            text/tsv:
+            application/xml:
               schema:
                 type: string
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+                description: "XLSX spreadsheet"
+            application/vnd.oasis.opendocument.spreadsheet:
+              schema:
+                type: string
+                format: binary
+                description: "OpenDocument spreadsheet"
         '400':
-          description: Invalid format or CSV error
+          description: Invalid format or writer parameter
           content:
             application/json:
               schema:
@@ -846,6 +894,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Invalid results hash
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Query-parameter validation failed
           content:
             application/json:
               schema:

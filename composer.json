@@ -3,7 +3,7 @@
     "ext-mbstring": "*",
     "ext-fileinfo": "*",
     "ext-gd": "*",
-    "1biot/fiquela": "^2.0",
+    "1biot/fiquela": "^3.0",
     "aws/aws-sdk-php": "^3.0",
     "contributte/psr11-container-interface": "^0.6.0",
     "firebase/php-jwt": "^7",

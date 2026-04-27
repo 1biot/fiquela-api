@@ -41,6 +41,16 @@ abstract class Controller
         return (new Processor)->process($schema->getSchema(), $request->getParsedBody());
     }
 
+    /**
+     * Validates the query-string of a GET request against a Nette schema.
+     *
+     * @throws ValidationException
+     */
+    protected function validateQueryParams(Request $request, Schema $schema): array
+    {
+        return (new Processor)->process($schema->getSchema(), $request->getQueryParams());
+    }
+
     protected function json(Response $response, array $data, int $status = 200): Response
     {
         $responseContent = $response->getBody();
